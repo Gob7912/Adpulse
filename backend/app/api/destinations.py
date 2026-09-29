@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,6 +10,7 @@ from app.models.destination import Destination
 from app.schemas.destination import (
     GoogleSheetsVerifyRequest,
     GoogleSheetsVerifyResponse,
+    GoogleSheetsServiceInfoResponse,
     DestinationResponse,
     TelegramBotInfoResponse
 )
@@ -32,6 +34,15 @@ async def get_telegram_bot_info(user: User = Depends(get_current_user)):
         error=error if not bot_username else None
     )
 
+@router.get("/sheets/service-info", response_model=GoogleSheetsServiceInfoResponse)
+async def get_sheets_service_info(user: User = Depends(get_current_user)):
+    """Returns the service account email configured in the backend."""
+    email = sheets_service.get_service_account_email()
+    return GoogleSheetsServiceInfoResponse(
+        service_account_email=email or None,
+        is_configured=bool(email)
+    )
+
 @router.post("/sheets/verify", response_model=GoogleSheetsVerifyResponse)
 async def verify_google_sheet(
     data: GoogleSheetsVerifyRequest,
@@ -45,15 +56,18 @@ async def verify_google_sheet(
             detail="Некорректная ссылка на Google Таблицу"
         )
 
-    res = sheets_service.verify_sheet_access(
+    res = await asyncio.to_thread(
+        sheets_service.verify_sheet_access,
         spreadsheet_id=spreadsheet_id,
         tab_name=data.sheets_tab_name
     )
+    email = sheets_service.get_service_account_email()
     return GoogleSheetsVerifyResponse(
         success=res.get("success", False),
         title=res.get("title"),
         tab_name=res.get("tab_name"),
-        message=res.get("message", "")
+        message=res.get("message", ""),
+        service_account_email=email or None
     )
 
 @router.get("/{report_id}/status", response_model=list[DestinationResponse])

@@ -154,7 +154,8 @@ async def disconnect_meta(
 
 @router.get("/adaccounts", response_model=list[MetaAdAccountResponse])
 async def get_ad_accounts(
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     if not user.meta_connection or not user.meta_connection.encrypted_access_token:
         raise HTTPException(
@@ -183,6 +184,9 @@ async def get_ad_accounts(
             for a in accounts
         ]
     except MetaTokenExpiredError as exc:
+        if user.meta_connection:
+            user.meta_connection.is_valid = False
+            await db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=exc.message)
     except MetaAPIError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
@@ -192,7 +196,8 @@ async def get_ad_accounts(
 @router.get("/campaigns", response_model=list[MetaCampaignResponse])
 async def get_campaigns(
     ad_account_id: str = Query(..., description="Meta Ad Account ID, e.g. act_123456789"),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     if not user.meta_connection or not user.meta_connection.encrypted_access_token:
         raise HTTPException(
@@ -219,6 +224,9 @@ async def get_campaigns(
             for c in campaigns
         ]
     except MetaTokenExpiredError as exc:
+        if user.meta_connection:
+            user.meta_connection.is_valid = False
+            await db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=exc.message)
     except MetaAPIError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)

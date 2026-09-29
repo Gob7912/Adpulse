@@ -16,6 +16,34 @@ class SheetsService:
     def __init__(self):
         self._service = None
 
+    def get_service_account_email(self) -> str:
+        """Reads client_email from the configured service account credentials or settings."""
+        if settings.GOOGLE_SERVICE_ACCOUNT_EMAIL:
+            return settings.GOOGLE_SERVICE_ACCOUNT_EMAIL.strip()
+        if settings.GOOGLE_SERVICE_ACCOUNT_JSON:
+            raw = settings.GOOGLE_SERVICE_ACCOUNT_JSON.strip()
+            if raw.startswith("{"):
+                try:
+                    info = json.loads(raw)
+                    email = info.get("client_email")
+                    if email:
+                        return email.strip()
+                except Exception:
+                    pass
+            elif raw.endswith(".json"):
+                try:
+                    with open(raw, "r", encoding="utf-8") as f:
+                        info = json.load(f)
+                        email = info.get("client_email")
+                        if email:
+                            return email.strip()
+                except Exception:
+                    pass
+        creds = self._get_credentials()
+        if creds and hasattr(creds, "service_account_email") and creds.service_account_email:
+            return creds.service_account_email.strip()
+        return ""
+
     def _get_credentials(self):
         # 1. From JSON env string or file
         if settings.GOOGLE_SERVICE_ACCOUNT_JSON:
@@ -85,9 +113,9 @@ class SheetsService:
             title = sheet_meta.get("properties", {}).get("title", "Untitled")
 
             sheets = sheet_meta.get("sheets", [])
-            sheet_titles = [s.get("properties", {}).get("title") for s in sheets]
+            sheet_titles = [s.get("properties", {}).get("title") for s in sheets if s.get("properties", {}).get("title")]
 
-            tab_to_use = tab_name or (sheet_titles[0] if sheet_titles else "Sheet1")
+            tab_to_use = tab_name.strip() if (tab_name and tab_name.strip()) else (sheet_titles[0] if sheet_titles else "Sheet1")
             
             # Verify if tab exists, or can create it
             if tab_to_use not in sheet_titles:
@@ -104,7 +132,7 @@ class SheetsService:
             if status == 404:
                 return {"success": False, "message": "Таблица не найдена. Проверьте правильность ссылки."}
             elif status == 403:
-                email = settings.GOOGLE_SERVICE_ACCOUNT_EMAIL or "service-account email"
+                email = self.get_service_account_email() or "service-account email"
                 return {
                     "success": False,
                     "message": f"Нет прав доступа к таблице. Поделитесь таблицей с email: {email} и выдайте роль «Редактор»."
@@ -116,16 +144,25 @@ class SheetsService:
     def append_report_row(
         self,
         spreadsheet_id: str,
-        tab_name: str,
+        tab_name: str | None,
         header_labels: list[str],
         row_values: list[Any]
     ) -> bool:
         """
         Appends a report row to the target spreadsheet.
-        Automatically creates tab and header row if missing, and dynamically adds missing columns.
+        Automatically resolves tab name from spreadsheet if not specified,
+        creates tab and header row if missing, and dynamically adds missing columns.
         """
         service = self.get_service()
-        tab = tab_name or "Sheet1"
+        tab = tab_name.strip() if (tab_name and tab_name.strip()) else None
+        if not tab:
+            try:
+                sheet_meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+                sheets = sheet_meta.get("sheets", [])
+                sheet_titles = [s.get("properties", {}).get("title") for s in sheets if s.get("properties", {}).get("title")]
+                tab = sheet_titles[0] if sheet_titles else "Sheet1"
+            except Exception:
+                tab = "Sheet1"
 
         # Ensure tab exists in the spreadsheet
         self._ensure_tab_exists(service, spreadsheet_id, tab)

@@ -231,7 +231,8 @@ class ReportEngine:
         selected_metrics: list[str],
         metric_values: dict[str, Any],
         custom_labels: dict[str, str] | None = None,
-        lang: str = "ru"
+        lang: str = "ru",
+        template_type: str | None = None
     ) -> str:
         """Constructs a clean Telegram message."""
         default_labels = get_default_labels(lang)
@@ -244,8 +245,31 @@ class ReportEngine:
         }
         header_title = period_title_map.get(periodicity, period_title_map["daily"]).get(lang, "Daily Report")
 
+        # Select header emoji based on template_type or metric composition:
+        # pulse: 📊, leads: 🎯, messages: 💬, awareness: 👁
+        emoji_map = {
+            "daily_pulse": "📊",
+            "pulse": "📊",
+            "lead_generation": "🎯",
+            "leads": "🎯",
+            "direct_messages": "💬",
+            "messages": "💬",
+            "brand_awareness": "👁",
+            "awareness": "👁",
+        }
+        if template_type and template_type in emoji_map:
+            header_emoji = emoji_map[template_type]
+        elif "leads" in selected_metrics or "cpl" in selected_metrics:
+            header_emoji = "🎯"
+        elif "messages" in selected_metrics or "cost_per_dm" in selected_metrics:
+            header_emoji = "💬"
+        elif "reach" in selected_metrics and "impressions" in selected_metrics and "spend" in selected_metrics and len(selected_metrics) <= 5 and "leads" not in selected_metrics and "messages" not in selected_metrics and "clicks" not in selected_metrics:
+            header_emoji = "👁"
+        else:
+            header_emoji = "📊"
+
         lines = [
-            f"📊 <b>{header_title}: {report_name}</b>",
+            f"{header_emoji} <b>{header_title}: {report_name}</b>",
             f"🏢 <code>{account_name}</code> ({currency})",
             f"📅 <code>{since_date}</code>" if since_date == until_date else f"📅 <code>{since_date} — {until_date}</code>",
             ""
@@ -255,7 +279,12 @@ class ReportEngine:
         spend_val = metric_values.get("spend") or 0.0
         impr_val = metric_values.get("impressions") or 0
         if spend_val == 0.0 and impr_val == 0:
-            lines.append("<i>ℹ️ За указанный период расходов и показов по выбранным кампаниям не зафиксировано.</i>")
+            no_data_map = {
+                "ru": "<i>ℹ️ За указанный период расходов и показов по выбранным кампаниям не зафиксировано.</i>",
+                "uz": "<i>ℹ️ Tanlangan davr uchun ko'rsatilgan kampaniyalar bo'yicha xarajat va taassurotlar qayd etilmadi.</i>",
+                "en": "<i>ℹ️ No spend or impressions recorded for the selected campaigns during this period.</i>",
+            }
+            lines.append(no_data_map.get(lang, no_data_map["ru"]))
             return "\n".join(lines)
 
         for key in selected_metrics:

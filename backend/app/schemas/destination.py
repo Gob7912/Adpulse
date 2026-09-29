@@ -33,12 +33,18 @@ class TelegramBotInfoResponse(BaseModel):
     is_configured: bool = False
     error: Optional[str] = None
 
+class GoogleSheetsServiceInfoResponse(BaseModel):
+    service_account_email: Optional[str] = None
+    is_configured: bool = False
+
 class GoogleSheetsVerifyRequest(BaseModel):
     sheets_url: str
-    sheets_tab_name: Optional[str] = "Sheet1"
+    sheets_tab_name: Optional[str] = None
 
 class GoogleSheetsVerifyResponse(BaseModel):
     success: bool
     title: Optional[str] = None
     tab_name: Optional[str] = None
     message: str
+    service_account_email: Optional[str] = None
+

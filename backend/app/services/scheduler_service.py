@@ -352,9 +352,10 @@ class SchedulerService:
                                 custom_labels=report.metric_labels or {},
                                 lang=report.metric_lang or "ru"
                             )
-                            sheets_service.append_report_row(
+                            await asyncio.to_thread(
+                                sheets_service.append_report_row,
                                 spreadsheet_id=dest.sheets_spreadsheet_id,
-                                tab_name=dest.sheets_tab_name or "Sheet1",
+                                tab_name=dest.sheets_tab_name,
                                 header_labels=headers,
                                 row_values=row
                             )

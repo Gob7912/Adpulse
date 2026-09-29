@@ -190,11 +190,16 @@ class ApiClient {
     return this.request<TelegramBotInfoResponse>('/destinations/telegram/bot-info');
   }
 
+  async getSheetsServiceInfo(): Promise<{ service_account_email: string | null; is_configured: boolean }> {
+    return this.request<{ service_account_email: string | null; is_configured: boolean }>('/destinations/sheets/service-info');
+  }
+
   async verifyGoogleSheet(sheetsUrl: string, sheetsTabName?: string): Promise<{
     success: boolean;
     title?: string;
     tab_name?: string;
     message: string;
+    service_account_email?: string;
   }> {
     return this.request('/destinations/sheets/verify', {
       method: 'POST',

@@ -28,3 +28,20 @@ def test_sheets_tab_escaping():
     assert SheetsService.escape_tab_name("Client's Report") == "Client''s Report"
     assert SheetsService.escape_tab_name("O'Connor's Data") == "O''Connor''s Data"
 
+def test_get_service_account_email(monkeypatch):
+    svc = SheetsService()
+
+    # 1. From settings.GOOGLE_SERVICE_ACCOUNT_EMAIL
+    monkeypatch.setattr("app.config.settings.GOOGLE_SERVICE_ACCOUNT_EMAIL", "direct@test.iam.gserviceaccount.com")
+    assert svc.get_service_account_email() == "direct@test.iam.gserviceaccount.com"
+
+    # 2. From JSON string
+    monkeypatch.setattr("app.config.settings.GOOGLE_SERVICE_ACCOUNT_EMAIL", "")
+    monkeypatch.setattr("app.config.settings.GOOGLE_SERVICE_ACCOUNT_JSON", '{"client_email": "json@test.iam.gserviceaccount.com"}')
+    assert svc.get_service_account_email() == "json@test.iam.gserviceaccount.com"
+
+    # 3. Empty when not configured
+    monkeypatch.setattr("app.config.settings.GOOGLE_SERVICE_ACCOUNT_JSON", "")
+    assert svc.get_service_account_email() == ""
+
+

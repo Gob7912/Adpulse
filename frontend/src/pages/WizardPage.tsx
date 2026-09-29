@@ -106,15 +106,23 @@ export const WizardPage: React.FC<WizardPageProps> = ({
   const [testSending, setTestSending] = useState(false);
   const [botInfo, setBotInfo] = useState<TelegramBotInfoResponse | null>(null);
 
-  const serviceAccountEmail = 'adpulse-service@adpulse-reports.iam.gserviceaccount.com';
+  const [serviceAccountEmail, setServiceAccountEmail] = useState<string>('adpulse-service@adpulse-reports.iam.gserviceaccount.com');
 
-  // Load Telegram bot info at runtime
+  // Load Telegram bot info and Sheets service account email at runtime
   useEffect(() => {
     api.getTelegramBotInfo()
       .then(setBotInfo)
       .catch((err) => {
         setBotInfo({ bot_username: null, is_configured: false, error: err.message });
       });
+
+    api.getSheetsServiceInfo()
+      .then((info) => {
+        if (info.service_account_email) {
+          setServiceAccountEmail(info.service_account_email);
+        }
+      })
+      .catch(() => {});
   }, [step]);
 
   // Load existing report if editingReportId is provided
@@ -350,15 +358,19 @@ export const WizardPage: React.FC<WizardPageProps> = ({
     setTestSending(true);
     try {
       const res = await api.triggerTestSend(createdReport.id);
-      if (res.status === 'success' || res.status === 'partial') {
+      if (res.status === 'success') {
         setToast(t.step5.test_sent_toast);
+      } else if (res.status === 'partial') {
+        const detail = [res.telegram_error, res.sheets_error].filter(Boolean).join('; ');
+        setToast(`${t.step5.test_sent_toast} (${detail})`);
       } else {
-        setToast(`Результат теста: ${res.error || res.status}`);
+        const detail = [res.error, res.telegram_error, res.sheets_error].filter(Boolean).join('; ') || res.status;
+        setToast(`Результат теста: ${detail}`);
       }
-      setTimeout(() => setToast(null), 5000);
+      setTimeout(() => setToast(null), 6000);
     } catch (err: any) {
       setToast(`Ошибка отправки: ${err.message}`);
-      setTimeout(() => setToast(null), 5000);
+      setTimeout(() => setToast(null), 6000);
     } finally {
       setTestSending(false);
     }
@@ -368,6 +380,12 @@ export const WizardPage: React.FC<WizardPageProps> = ({
     if (!sheetsUrl.trim()) return;
     try {
       const res = await api.verifyGoogleSheet(sheetsUrl.trim(), sheetsTabName);
+      if (res.tab_name) {
+        setSheetsTabName(res.tab_name);
+      }
+      if (res.service_account_email) {
+        setServiceAccountEmail(res.service_account_email);
+      }
       setSheetsVerifyStatus(res.message);
     } catch (err: any) {
       setSheetsVerifyStatus(err.message);

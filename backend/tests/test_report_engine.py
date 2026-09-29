@@ -86,7 +86,8 @@ def test_telegram_zero_spend_fallback():
         "impressions": 0,
         "clicks": 0
     }
-    msg = ReportEngine.build_telegram_message(
+    # RU
+    msg_ru = ReportEngine.build_telegram_message(
         report_name="Тестовый отчёт",
         account_name="Тест Аккаунт",
         currency="USD",
@@ -97,7 +98,80 @@ def test_telegram_zero_spend_fallback():
         metric_values=zero_metrics,
         lang="ru"
     )
-    assert "За указанный период расходов и показов" in msg
+    assert "За указанный период расходов и показов" in msg_ru
+
+    # UZ
+    msg_uz = ReportEngine.build_telegram_message(
+        report_name="Test hisobot",
+        account_name="Test Account",
+        currency="USD",
+        periodicity="daily",
+        since_date="2026-09-28",
+        until_date="2026-09-28",
+        selected_metrics=["spend", "impressions"],
+        metric_values=zero_metrics,
+        lang="uz"
+    )
+    assert "xarajat va taassurotlar qayd etilmadi" in msg_uz
+
+    # EN
+    msg_en = ReportEngine.build_telegram_message(
+        report_name="Test Report",
+        account_name="Test Account",
+        currency="USD",
+        periodicity="daily",
+        since_date="2026-09-28",
+        until_date="2026-09-28",
+        selected_metrics=["spend", "impressions"],
+        metric_values=zero_metrics,
+        lang="en"
+    )
+    assert "No spend or impressions recorded" in msg_en
+
+def test_telegram_header_emojis():
+    vals = {"spend": 50.0, "impressions": 1000, "leads": 5, "messages": 10}
+    # Leads template emoji
+    msg_leads = ReportEngine.build_telegram_message(
+        report_name="Leads",
+        account_name="Acc",
+        currency="USD",
+        periodicity="daily",
+        since_date="2026-09-28",
+        until_date="2026-09-28",
+        selected_metrics=["spend", "leads"],
+        metric_values=vals,
+        template_type="lead_generation"
+    )
+    assert "🎯" in msg_leads
+
+    # Direct messages emoji
+    msg_dm = ReportEngine.build_telegram_message(
+        report_name="DM",
+        account_name="Acc",
+        currency="USD",
+        periodicity="daily",
+        since_date="2026-09-28",
+        until_date="2026-09-28",
+        selected_metrics=["spend", "messages"],
+        metric_values=vals,
+        template_type="direct_messages"
+    )
+    assert "💬" in msg_dm
+
+    # Pulse emoji
+    msg_pulse = ReportEngine.build_telegram_message(
+        report_name="Pulse",
+        account_name="Acc",
+        currency="USD",
+        periodicity="daily",
+        since_date="2026-09-28",
+        until_date="2026-09-28",
+        selected_metrics=["spend", "impressions"],
+        metric_values=vals,
+        template_type="daily_pulse"
+    )
+    assert "📊" in msg_pulse
+
 
 def test_sheets_row_data_builder():
     sample_metrics = {"spend": 100.0, "leads": 25}
