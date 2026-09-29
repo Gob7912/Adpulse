@@ -192,10 +192,10 @@ METRIC_DEFINITIONS: dict[str, MetricDefinition] = {
         ru_label="Новые подписчики",
         uz_label="Yangi obunachilar",
         en_label="New Followers",
-        tooltip_ru="Новые подписчики профиля с рекламных кампаний (Meta API: ограниченная доступность)",
-        tooltip_uz="Reklama orqali qo'shilgan yangi obunachilar",
-        tooltip_en="New page/profile followers attributed to ads (subject to format support)",
-        meta_action_type="page_engagement",
+        tooltip_ru="Отметки «Нравится» страницы Facebook с рекламы (Meta API: подписчики Instagram не поддерживаются в Insights)",
+        tooltip_uz="Facebook sahifasiga obuna bo'lishlar (Meta API Instagram obunachilarini bermaydi)",
+        tooltip_en="Facebook Page likes/follows attributed to ads (Instagram followers not supported in Ads Insights)",
+        meta_action_type="like",
         is_limited=True,
         sample_value=35
     ),
@@ -264,7 +264,7 @@ METRIC_DEFINITIONS: dict[str, MetricDefinition] = {
         tooltip_ru="Количество звонков с рекламы 'Позвонить'",
         tooltip_uz="Reklamadagi 'Qo'ng'iroq qilish' orqali amalga oshirilgan qo'ng'iroqlar",
         tooltip_en="Number of phone calls initiated from call ads",
-        meta_action_type="call_confirm",
+        meta_action_type="phone_call",
         sample_value=9
     ),
     "cost_per_call": MetricDefinition(
@@ -442,9 +442,13 @@ def get_default_labels(lang: str = "ru") -> dict[str, str]:
             labels[key] = definition.ru_label
     return labels
 
-def format_metric_value(val: float | None, format_type: str, currency: str = "USD") -> str:
+def format_metric_value(val: float | int | None, format_type: str, currency: str = "USD", lang: str = "ru") -> str:
     if val is None:
-        return "0"
+        if lang == "uz":
+            return "mavjud emas"
+        elif lang == "en":
+            return "N/A"
+        return "н/д"
     if format_type == "currency":
         curr_symbol = "$" if currency == "USD" else f" {currency}"
         if currency == "USD":

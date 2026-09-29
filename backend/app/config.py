@@ -33,8 +33,14 @@ class Settings(BaseSettings):
     )
     
     # Meta Graph API
-    META_GRAPH_API_VERSION: str = "v21.0"
-    META_GRAPH_API_BASE: str = "https://graph.facebook.com/v21.0"
+    META_GRAPH_API_VERSION: str = Field(default="v21.0", description="Supported Meta Marketing / Graph API Version")
+    
+    @property
+    def META_GRAPH_API_BASE(self) -> str:
+        version = self.META_GRAPH_API_VERSION.strip()
+        if not version.startswith("v"):
+            version = f"v{version}"
+        return f"https://graph.facebook.com/{version}"
     
     # Report timing
     FINAL_DATA_DELAY_HOURS: int = 6

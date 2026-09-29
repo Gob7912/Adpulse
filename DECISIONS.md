@@ -28,7 +28,7 @@ This document records sensible defaults, design decisions, and Meta Marketing AP
 ---
 
 ## 4. Meta Marketing API & Metrics Mapping
-- **Pinned Graph API Version**: `v21.0` (`https://graph.facebook.com/v21.0`).
+- **Pinned Graph API Version**: `v21.0` (`https://graph.facebook.com/v21.0`), officially supported by Meta and dynamically constructed from `settings.META_GRAPH_API_VERSION`.
 - **Token Verification**: Calls `GET /me` (retrieves name and id) and `GET /me/adaccounts?fields=id,name,account_id,currency,timezone_name,account_status`.
 - **Deduplication of Reach & Frequency**:
   - Reach cannot be summed across campaigns without overcounting unique users.
@@ -36,20 +36,27 @@ This document records sensible defaults, design decisions, and Meta Marketing AP
     `level=account&filtering=[{"field":"campaign.id","operator":"IN","value":[<campaign_ids>]}]`.
     This delegates cross-campaign reach deduplication to Meta's data engine.
 - **Strict Ratio Calculation (No Averaging)**:
-  - Additive metrics (`spend`, `impressions`, `clicks`, `inline_link_clicks`, `leads`, `messages`, `calls`, `purchases`) are summed.
-  - All rates and costs are calculated strictly from the aggregate sums:
+  - Additive metrics (`spend`, `impressions`, `clicks`, `inline_link_clicks`, `leads`, `messages`, `calls`, `purchases`) are summed from raw actions.
+  - All rates and costs are calculated strictly from the aggregate totals:
     - `CTR` = $\frac{\text{clicks}}{\text{impressions}} \times 100\%$
     - `CTR (link)` = $\frac{\text{inline\_link\_clicks}}{\text{impressions}} \times 100\%$
-    - `CPC` = $\frac{\text{spend}}{\text{clicks}}$
-    - `CPM` = $\frac{\text{spend}}{\text{impressions}} \times 1000$
-    - `CPP` = $\frac{\text{spend}}{\text{reach}} \times 1000$
-    - `CPL` = $\frac{\text{spend}}{\text{leads}}$
-    - `Cost per DM` = $\frac{\text{spend}}{\text{messages}}$
-    - `Cost per call` = $\frac{\text{spend}}{\text{calls}}$
-    - `Cost per install` = $\frac{\text{spend}}{\text{app\_installs}}$
-    - `ROAS` = $\frac{\text{purchase\_value}}{\text{spend}}$
-- **Reliability of Profile Visits & Followers**:
-  - *Decision*: In Meta Graph API v21.0, organic Instagram profile visits and new followers are not standard fields on ad account insights without direct Instagram Graph API account link permissions. We map them where available via `actions[onsite_conversion.messaging_user_profile_click]` / `actions[page_engagement]`, but explicitly label them in the UI and documentation as "(Meta API: subject to ad format support)" and default to 0 if not reported by Meta, avoiding runtime exceptions.
+    - `CPC` = $\frac{\text{spend}}{\text{clicks}}$ (or `None` if clicks = 0)
+    - `CPM` = $\frac{\text{spend}}{\text{impressions}} \times 1000$ (or `None` if impressions = 0)
+    - `CPP` = $\frac{\text{spend}}{\text{reach}} \times 1000$ (or `None` if reach = 0)
+    - `CPL` = $\frac{\text{spend}}{\text{leads}}$ (or `None` if leads = 0 or absent)
+    - `Cost per DM` = $\frac{\text{spend}}{\text{messages}}$ (or `None` if messages = 0 or absent)
+    - `Cost per call` = $\frac{\text{spend}}{\text{calls}}$ (or `None` if calls = 0 or absent)
+    - `Cost per install` = $\frac{\text{spend}}{\text{app\_installs}}$ (or `None` if app_installs = 0 or absent)
+    - `ROAS` = $\frac{\text{purchase\_value}}{\text{spend}}$ (or `None` if spend = 0 or purchase_value = 0)
+- **Corrected Action Type Mappings**:
+  - **Messages / DM**: Strictly mapped to `onsite_conversion.messaging_conversation_started_7d`. Never sum with `onsite_conversion.total_messaging_connection` (which represents connection interactions that overcounted lead forms to ~119). In non-messaging campaigns (e.g. Lead Forms), if no conversation started is recorded, `messages` and `cost_per_dm` correctly evaluate to `None` -> displayed as localized "н/д" / "N/A", never a fake cost like $0.22.
+  - **Leads**: Mapped to `lead` (which in Meta Marketing API is already the aggregate of onsite instant forms and website pixel leads). If `lead` is absent, falls back to `onsite_conversion.lead_grouped + offsite_conversion.fb_pixel_lead` or `leadgen.other`. Never sums `lead` and `lead_grouped` together, avoiding double-counting.
+  - **New Followers**: Mapped to `like` (Page Likes) or `follow`. Meta Ads Insights does not provide Instagram follower acquisition metrics. Never maps to `page_engagement` (which caused 9,236 by summing all post reactions, video views, and comments). If no follower action is tracked, it renders as "н/д" / "N/A", never a fake number or 0.
+  - **Calls**: Mapped to `phone_call`, `call_confirm`, or `onsite_conversion.call_attempt`.
+  - **App Installs**: Mapped to `mobile_app_install` or `omni_app_install`.
+- **Handling of Unavailable / Non-Applicable Metrics**:
+  - Any metric not recorded or not reliably available evaluates to `None` and is rendered in Telegram and UI as localized `"н/д"` (RU), `"mavjud emas"` (UZ), or `"N/A"` (EN).
+  - In Google Sheets, `None` metrics are written as empty cells (`""`), and valid numbers are written strictly as numeric floats/ints.
 - **Final Data Delay**:
   - Meta revises attribution data for recent conversions.
   - AdPulse enforces `FINAL_DATA_DELAY_HOURS` (default: 6 hours). If a report is scheduled earlier than 6 hours after the period ended in the ad account's timezone, the job runner defers execution to the first valid timestamp.
