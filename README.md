@@ -49,8 +49,8 @@
 
 ```bash
 # 1. Склонируйте репозиторий
-git clone <repo-url> reportograph
-cd reportograph
+git clone https://github.com/Gob7912/Adpulse.git adpulse
+cd adpulse
 
 # 2. Скопируйте и настройте переменные окружения
 cp .env.example .env
@@ -116,7 +116,7 @@ source venv/bin/activate
 pytest tests/ -v
 ```
 
-Все 21 тест покрывают:
+Все 43 теста покрывают:
 - Строгий расчёт соотношений без усреднения (CTR, CPC, CPM, CPP, CPL, Cost per DM, ROAS).
 - Защиту от деления на ноль при пустых кампаниях.
 - Задержку финальных данных (Final data delay 6h) с учётом часовых поясов.
