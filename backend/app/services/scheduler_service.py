@@ -316,6 +316,16 @@ class SchedulerService:
                 if dest.destination_type == "telegram":
                     if dest.is_connected and dest.telegram_chat_id:
                         try:
+                            # Detect template type from campaign_filter_goals or metrics
+                            detected_type = None
+                            goals = [str(g).upper() for g in (report.campaign_filter_goals or [])]
+                            if any("LEAD" in g for g in goals):
+                                detected_type = "lead_generation"
+                            elif any("MESSAGE" in g for g in goals):
+                                detected_type = "direct_messages"
+                            elif any("AWARENESS" in g or "REACH" in g for g in goals):
+                                detected_type = "brand_awareness"
+
                             msg_text = ReportEngine.build_telegram_message(
                                 report_name=report.name,
                                 account_name=report.meta_account_name,
@@ -326,7 +336,8 @@ class SchedulerService:
                                 selected_metrics=report.metrics or [],
                                 metric_values=metrics_data,
                                 custom_labels=report.metric_labels or {},
-                                lang=report.metric_lang or "ru"
+                                lang=report.metric_lang or "ru",
+                                template_type=detected_type
                             )
                             await telegram_sender.send_message(
                                 chat_id=dest.telegram_chat_id,

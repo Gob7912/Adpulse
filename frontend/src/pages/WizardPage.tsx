@@ -30,6 +30,7 @@ import {
   ArrowRight,
   ArrowLeft
 } from 'lucide-react';
+import { getReportTypeIcon } from '../utils/reportIcons';
 
 interface WizardPageProps {
   onFinish: () => void;
@@ -903,6 +904,7 @@ export const WizardPage: React.FC<WizardPageProps> = ({
                   const isSelected = selectedTemplate === tmpl.id;
                   const title = language === 'uz' ? tmpl.title_uz : language === 'en' ? tmpl.title_en : tmpl.title_ru;
                   const desc = language === 'uz' ? tmpl.desc_uz : language === 'en' ? tmpl.desc_en : tmpl.desc_ru;
+                  const TemplateIcon = getReportTypeIcon(tmpl.id);
 
                   return (
                     <div
@@ -915,13 +917,16 @@ export const WizardPage: React.FC<WizardPageProps> = ({
                       }`}
                     >
                       <div>
-                        {tmpl.is_recommended && (
-                          <div className="mb-2">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                            <TemplateIcon className="w-4 h-4" />
+                          </div>
+                          {tmpl.is_recommended && (
                             <span className="px-2 py-0.5 rounded text-[9px] bg-indigo-600 text-white font-semibold">
                               {t.step3.recommended_badge}
                             </span>
-                          </div>
-                        )}
+                          )}
+                        </div>
                         <div className="font-bold text-xs text-white mb-1">{title}</div>
                         <div className="text-[10px] text-slate-400 leading-tight">{desc}</div>
                       </div>

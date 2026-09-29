@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Edit2
 } from 'lucide-react';
+import { getReportTypeIcon } from '../utils/reportIcons';
 
 interface DashboardPageProps {
   onCreateReport: () => void;
@@ -164,17 +165,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 {reports.map((rep) => {
                   const tgDest = rep.destinations.find(d => d.destination_type === 'telegram');
                   const sheetsDest = rep.destinations.find(d => d.destination_type === 'google_sheets');
+                  const RowIcon = getReportTypeIcon(null, {
+                    metrics: rep.metrics,
+                    goals: rep.campaign_filter_goals
+                  });
 
                   return (
                     <tr key={rep.id} className="hover:bg-slate-800/30 transition-colors">
                       {/* Name & Ad Account */}
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-100">{rep.name}</div>
-                        <div className="text-[11px] text-slate-400 flex items-center space-x-1.5 mt-0.5">
-                          <span>{rep.meta_account_name}</span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-indigo-300 font-mono">
-                            {rep.currency}
-                          </span>
+                        <div className="flex items-center space-x-2.5">
+                          <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
+                            <RowIcon className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-100">{rep.name}</div>
+                            <div className="text-[11px] text-slate-400 flex items-center space-x-1.5 mt-0.5">
+                              <span>{rep.meta_account_name}</span>
+                              <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-indigo-300 font-mono">
+                                {rep.currency}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </td>
 
