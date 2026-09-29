@@ -1,0 +1,193 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0c0f17;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e2638;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2a354d;
+}
+
+/* Base styles for dark (default) and light modes */
+body {
+  background-color: #0c0f17;
+  color: #f1f5f9;
+}
+
+html.light body,
+html:not(.dark) body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Light Mode Overrides */
+html.light,
+html:not(.dark) {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.light ::-webkit-scrollbar-track,
+html:not(.dark) ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.light ::-webkit-scrollbar-thumb,
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover,
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Surfaces and Cards */
+html.light .bg-\[\#0c0f17\],
+html:not(.dark) .bg-\[\#0c0f17\] {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-\[\#0c0f17\]\/90,
+html.light .bg-\[\#0c0f17\]\/80,
+html:not(.dark) .bg-\[\#0c0f17\]\/90,
+html:not(.dark) .bg-\[\#0c0f17\]\/80 {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+
+html.light .bg-\[\#121622\],
+html.light .bg-\[\#121620\],
+html:not(.dark) .bg-\[\#121622\],
+html:not(.dark) .bg-\[\#121620\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03) !important;
+}
+
+html.light .bg-\[\#161c2b\],
+html.light .bg-\[\#181f2f\],
+html:not(.dark) .bg-\[\#161c2b\],
+html:not(.dark) .bg-\[\#181f2f\] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Borders */
+html.light .border-slate-800,
+html.light .border-slate-800\/80,
+html.light .border-slate-800\/60,
+html.light .border-slate-800\/50,
+html.light .border-slate-700,
+html.light .border-slate-700\/60,
+html:not(.dark) .border-slate-800,
+html:not(.dark) .border-slate-800\/80,
+html:not(.dark) .border-slate-800\/60,
+html:not(.dark) .border-slate-800\/50,
+html:not(.dark) .border-slate-700,
+html:not(.dark) .border-slate-700\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .divide-slate-800\/80 > :not([hidden]) ~ :not([hidden]),
+html.light .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+html:not(.dark) .divide-slate-800\/80 > :not([hidden]) ~ :not([hidden]),
+html:not(.dark) .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+/* Typography in light mode */
+html.light .text-white,
+html:not(.dark) .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-100,
+html.light .text-slate-200,
+html.light .text-slate-300,
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-400,
+html:not(.dark) .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500,
+html:not(.dark) .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+/* Table rows, hover states, badges */
+html.light .hover\:bg-slate-800\/30:hover,
+html.light .hover\:bg-slate-800\/50:hover,
+html.light .hover\:bg-slate-800\/70:hover,
+html.light .hover\:bg-slate-800:hover,
+html:not(.dark) .hover\:bg-slate-800\/30:hover,
+html:not(.dark) .hover\:bg-slate-800\/50:hover,
+html:not(.dark) .hover\:bg-slate-800\/70:hover,
+html:not(.dark) .hover\:bg-slate-800:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-slate-800,
+html.light .bg-slate-800\/70,
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/30,
+html:not(.dark) .bg-slate-800,
+html:not(.dark) .bg-slate-800\/70,
+html:not(.dark) .bg-slate-800\/50,
+html:not(.dark) .bg-slate-800\/30 {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+html.light .bg-slate-900,
+html:not(.dark) .bg-slate-900 {
+  background-color: #f8fafc !important;
+}
+
+/* Form inputs & dropdowns */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea,
+html:not(.dark) input:not([type="checkbox"]):not([type="radio"]),
+html:not(.dark) select,
+html:not(.dark) textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder,
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Shadows */
+html.light .shadow-2xl,
+html.light .shadow-xl,
+html:not(.dark) .shadow-2xl,
+html:not(.dark) .shadow-xl {
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04) !important;
+}
