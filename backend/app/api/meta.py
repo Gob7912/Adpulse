@@ -1,28 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from datetime import datetime, timezone
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
 from app.database import get_db
-from app.models.user import User
 from app.models.meta_connection import MetaConnection
+from app.models.user import User
 from app.schemas.meta import (
-    MetaTokenVerifyRequest,
-    MetaProfileResponse,
     MetaAdAccountResponse,
     MetaCampaignResponse,
     MetaMetadataResponse,
     MetaMetricInfo,
-    MetaTemplateInfo
+    MetaProfileResponse,
+    MetaTemplateInfo,
+    MetaTokenVerifyRequest,
 )
-from app.services.meta_metrics import (
-    METRIC_DEFINITIONS,
-    TEMPLATES,
-    OPTIMIZATION_GOALS
-)
-from app.services.meta_client import MetaClient, MetaAPIError, MetaTokenExpiredError
-from app.security import encrypt_secret, decrypt_secret
-from app.api.deps import get_current_user
+from app.security import decrypt_secret, encrypt_secret
+from app.services.meta_client import MetaAPIError, MetaClient, MetaTokenExpiredError
+from app.services.meta_metrics import METRIC_DEFINITIONS, OPTIMIZATION_GOALS, TEMPLATES
 
 router = APIRouter(prefix="/meta", tags=["meta"])
 
@@ -86,7 +83,7 @@ async def verify_and_save_token(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Не удалось проверить токен: {str(exc)}"
+            detail=f"Не удалось проверить токен: {exc!s}"
         )
 
     # Encrypt token at rest

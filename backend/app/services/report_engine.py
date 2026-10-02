@@ -1,16 +1,14 @@
-from datetime import datetime, date, timedelta, timezone
-from zoneinfo import ZoneInfo
-from typing import Any, Optional
 import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any
+from zoneinfo import ZoneInfo
 
-from app.config import settings
 from app.services.meta_metrics import (
     METRIC_DEFINITIONS,
     MetricDefinition,
     format_metric_value,
-    get_default_labels
+    get_default_labels,
 )
-from app.services.meta_client import MetaClient
 
 logger = logging.getLogger("adpulse.report_engine")
 

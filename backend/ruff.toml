@@ -1,0 +1,14 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line too long
+    "E711",  # comparison to None (SQLAlchemy binary expressions)
+    "E712",  # comparison to True/False (SQLAlchemy binary expressions)
+    "F821",  # undefined name (SQLAlchemy forward references in Mapped)
+    "F841",  # unused variable in tests
+    "W291",  # trailing whitespace
+    "W293",  # blank line contains whitespace
+]

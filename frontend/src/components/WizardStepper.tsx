@@ -4,11 +4,12 @@ import { useLanguage } from '../context/LanguageContext';
 
 interface WizardStepperProps {
   currentStep: number;
+  isEditing?: boolean;
   onStepClick?: (step: number) => void;
   onClose: () => void;
 }
 
-export const WizardStepper: React.FC<WizardStepperProps> = ({ currentStep, onStepClick, onClose }) => {
+export const WizardStepper: React.FC<WizardStepperProps> = ({ currentStep, isEditing, onStepClick, onClose }) => {
   const { t } = useLanguage();
 
   const steps = [
@@ -35,21 +36,22 @@ export const WizardStepper: React.FC<WizardStepperProps> = ({ currentStep, onSte
         {steps.map((step) => {
           const isCompleted = step.number < currentStep;
           const isCurrent = step.number === currentStep;
+          const isClickable = isCompleted || Boolean(isEditing);
 
           return (
             <div
               key={step.number}
               onClick={() => {
-                if (isCompleted && onStepClick) {
+                if (isClickable && onStepClick) {
                   onStepClick(step.number);
                 }
               }}
               className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all select-none ${
-                isCompleted ? 'cursor-pointer hover:border-slate-600' : ''
+                isClickable && !isCurrent ? 'cursor-pointer hover:border-slate-600' : ''
               } ${
                 isCurrent
                   ? 'border border-indigo-500 bg-indigo-950/40 text-indigo-300 ring-1 ring-indigo-500/50 shadow-md shadow-indigo-950/50'
-                  : isCompleted
+                  : isCompleted || isEditing
                   ? 'border border-slate-700 bg-slate-900/60 text-slate-300'
                   : 'border border-slate-800/80 bg-slate-900/20 text-slate-500'
               }`}

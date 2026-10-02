@@ -1,25 +1,23 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from typing import Optional
-from sqlalchemy import select, update
+
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.models.user import User
 from app.models.report import Report
-from app.models.destination import Destination
-from app.models.meta_connection import MetaConnection
 from app.models.run_history import RunHistory
+from app.models.user import User
 from app.security import decrypt_secret
-from app.services.meta_client import MetaClient, MetaTokenExpiredError, MetaAPIError
+from app.services.meta_client import MetaAPIError, MetaClient, MetaTokenExpiredError
 from app.services.meta_metrics import OBJECTIVE_TO_METRICS
 from app.services.report_engine import ReportEngine
-from app.services.telegram_sender import telegram_sender
 from app.services.sheets_service import sheets_service
+from app.services.telegram_sender import telegram_sender
 
 logger = logging.getLogger("adpulse.scheduler")
 

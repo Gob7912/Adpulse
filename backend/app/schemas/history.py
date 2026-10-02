@@ -1,6 +1,8 @@
-from pydantic import BaseModel
-from typing import Optional, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
+
 
 class RunHistoryResponse(BaseModel):
     id: str
@@ -13,10 +15,10 @@ class RunHistoryResponse(BaseModel):
     duration_seconds: float
     metrics_data: dict[str, Any]
     telegram_delivered: bool
-    telegram_error: Optional[str] = None
+    telegram_error: str | None = None
     sheets_delivered: bool
-    sheets_error: Optional[str] = None
-    error_message: Optional[str] = None
+    sheets_error: str | None = None
+    error_message: str | None = None
     created_at: datetime
 
     class Config:

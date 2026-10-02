@@ -1,5 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, Field
+
 
 class UserRegisterRequest(BaseModel):
     email: EmailStr

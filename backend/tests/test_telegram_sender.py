@@ -1,6 +1,9 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
 from app.services.telegram_sender import TelegramSender
+
 
 @pytest.mark.asyncio
 async def test_telegram_sender_with_thread_id():

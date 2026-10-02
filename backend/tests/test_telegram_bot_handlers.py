@@ -1,12 +1,12 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from types import SimpleNamespace
-from sqlalchemy import select
 
-from app.models.report import Report
+import pytest
+
 from app.models.destination import Destination
+from app.models.report import Report
 from app.models.user import User
-from app.services.telegram_bot import handle_start, handle_link_group
+from app.services.telegram_bot import handle_link_group, handle_start
+
 
 @pytest.mark.asyncio
 async def test_telegram_bot_handle_start_personal(test_db_session):

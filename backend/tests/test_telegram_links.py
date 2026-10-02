@@ -1,9 +1,9 @@
-import pytest
 from app.services.telegram_links import (
+    build_telegram_deep_link,
     clean_and_validate_bot_username,
     clean_and_validate_start_code,
-    build_telegram_deep_link
 )
+
 
 def test_bot_username_valid():
     username, err = clean_and_validate_bot_username("AdPulseBot")

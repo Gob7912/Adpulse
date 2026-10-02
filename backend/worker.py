@@ -1,8 +1,9 @@
 import asyncio
 import logging
+
 from app.config import settings
-from app.database import engine, Base
-import app.models
+from app.database import Base, engine
+import app.models  # noqa: F401
 from app.services.scheduler_service import scheduler_service
 from app.services.telegram_bot import run_bot_polling
 

@@ -1,7 +1,6 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from pydantic import Field
-from typing import Optional
-import os
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = "AdPulse"
 
@@ -48,11 +47,11 @@ class Settings(BaseSettings):
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_BOT_USERNAME: str = "AdPulseBot"
-    TELEGRAM_WEBHOOK_URL: Optional[str] = None
+    TELEGRAM_WEBHOOK_URL: str | None = None
     
     # Google Service Account
-    GOOGLE_SERVICE_ACCOUNT_JSON: Optional[str] = None
-    GOOGLE_SERVICE_ACCOUNT_EMAIL: Optional[str] = None
+    GOOGLE_SERVICE_ACCOUNT_JSON: str | None = None
+    GOOGLE_SERVICE_ACCOUNT_EMAIL: str | None = None
     
     # CORS
     CORS_ORIGINS: list[str] = ["*"]

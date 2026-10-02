@@ -1,10 +1,12 @@
-from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, InvalidHash
-from datetime import datetime, timedelta, timezone
-from cryptography.fernet import Fernet
-import jwt
 import time
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+
+import jwt
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHash, VerifyMismatchError
+from cryptography.fernet import Fernet
+
 from app.config import settings
 
 ph = PasswordHasher(

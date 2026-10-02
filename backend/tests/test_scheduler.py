@@ -1,7 +1,8 @@
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+
 from app.services.scheduler_service import SchedulerService
+
 
 def test_scheduler_calculate_next_run_daily():
     tz = ZoneInfo("Asia/Tashkent")

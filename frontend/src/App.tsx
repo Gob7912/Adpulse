@@ -70,7 +70,10 @@ const AppContent: React.FC = () => {
 
         {activePage === 'wizard' && (
           <WizardPage
-            onFinish={() => setCurrentPage('dashboard')}
+            onFinish={() => {
+              setEditingReportId(null);
+              setCurrentPage('dashboard');
+            }}
             onNavigateToTokenGuide={() => setCurrentPage('token-guide')}
             editingReportId={editingReportId}
           />

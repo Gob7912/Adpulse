@@ -1,5 +1,6 @@
+
 from pydantic import BaseModel, Field
-from typing import Any
+
 
 class MetaTokenVerifyRequest(BaseModel):
     access_token: str = Field(..., min_length=10)

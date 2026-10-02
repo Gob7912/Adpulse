@@ -1,15 +1,15 @@
 import logging
+
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart, Command
-from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command, CommandStart
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models.destination import Destination
-from app.models.report import Report
 from app.services.telegram_links import clean_and_validate_start_code
 
 logger = logging.getLogger("adpulse.telegram_bot")

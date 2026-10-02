@@ -1,7 +1,8 @@
-import re
 import json
 import logging
-from typing import Any, Optional
+import re
+from typing import Any
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -139,7 +140,7 @@ class SheetsService:
                 }
             return {"success": False, "message": f"Ошибка Google Sheets API: {exc}"}
         except Exception as exc:
-            return {"success": False, "message": f"Ошибка проверки таблицы: {str(exc)}"}
+            return {"success": False, "message": f"Ошибка проверки таблицы: {exc!s}"}
 
     def append_report_row(
         self,

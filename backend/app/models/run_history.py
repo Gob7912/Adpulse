@@ -1,8 +1,11 @@
-from datetime import datetime, timezone
 import uuid
-from sqlalchemy import String, Boolean, DateTime, Integer, Float, Text, ForeignKey, JSON
+from datetime import datetime, timezone
+
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.database import Base
+
 
 class RunHistory(Base):
     __tablename__ = "run_histories"

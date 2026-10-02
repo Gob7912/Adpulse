@@ -1,7 +1,8 @@
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+
 from app.services.report_engine import ReportEngine
+
 
 def test_calculate_period_dates_daily():
     ref_dt = datetime(2026, 9, 29, 10, 0, 0, tzinfo=ZoneInfo("Asia/Tashkent"))

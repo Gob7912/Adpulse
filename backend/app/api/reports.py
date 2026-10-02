@@ -1,40 +1,39 @@
 import secrets
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from sqlalchemy.orm import selectinload
-from datetime import datetime, timezone
+from datetime import timezone
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.api.deps import get_current_user
 from app.config import settings
 from app.database import get_db
-from app.models.user import User
-from app.models.report import Report
 from app.models.destination import Destination
-from app.models.run_history import RunHistory
+from app.models.report import Report
+from app.models.user import User
+from app.schemas.destination import DestinationResponse
 from app.schemas.report import (
     ReportCreateRequest,
-    ReportUpdateRequest,
-    ReportResponse,
     ReportLivePreviewRequest,
-    ReportLivePreviewResponse
+    ReportLivePreviewResponse,
+    ReportResponse,
+    ReportUpdateRequest,
 )
-from app.schemas.destination import DestinationResponse
-from app.services.scheduler_service import SchedulerService
-from app.services.report_engine import ReportEngine
-from app.services.sheets_service import SheetsService
 from app.services.meta_metrics import METRIC_DEFINITIONS
+from app.services.report_engine import ReportEngine
+from app.services.scheduler_service import SchedulerService
+from app.services.sheets_service import SheetsService
 from app.services.telegram_links import (
     build_telegram_deep_link,
     clean_and_validate_bot_username,
     clean_and_validate_start_code,
 )
 from app.services.telegram_sender import telegram_sender
-from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-def _build_destination_response(dest: Destination, bot_username: Optional[str] = None) -> DestinationResponse:
+def _build_destination_response(dest: Destination, bot_username: str | None = None) -> DestinationResponse:
     deep_link_personal = None
     deep_link_group = None
     link_err = None
@@ -69,8 +68,18 @@ def _build_destination_response(dest: Destination, bot_username: Optional[str] =
         link_error=link_err
     )
 
-def _build_report_response(report: Report, bot_username: Optional[str] = None) -> ReportResponse:
+def _build_report_response(report: Report, bot_username: str | None = None) -> ReportResponse:
     dest_responses = [_build_destination_response(d, bot_username=bot_username) for d in report.destinations]
+    next_run = report.next_run_at
+    if next_run and next_run.tzinfo is None:
+        next_run = next_run.replace(tzinfo=timezone.utc)
+    created_at = report.created_at
+    if created_at and created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    updated_at = report.updated_at
+    if updated_at and updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+
     return ReportResponse(
         id=report.id,
         user_id=report.user_id,
@@ -93,12 +102,12 @@ def _build_report_response(report: Report, bot_username: Optional[str] = None) -
         schedule_monthday=report.schedule_monthday,
         send_timezone=report.send_timezone,
         is_active=report.is_active,
-        next_run_at=report.next_run_at,
+        next_run_at=next_run,
         last_run_at=report.last_run_at,
         last_run_status=report.last_run_status,
         last_run_error=report.last_run_error,
-        created_at=report.created_at,
-        updated_at=report.updated_at,
+        created_at=created_at,
+        updated_at=updated_at,
         destinations=dest_responses
     )
 
@@ -238,6 +247,16 @@ async def update_report(
 
     update_dict = data.model_dump(exclude_unset=True)
 
+    # Detect if schedule or account actually changed
+    schedule_keys = ("periodicity", "schedule_time", "send_timezone", "schedule_weekday", "schedule_monthday", "account_timezone")
+    schedule_changed = any(
+        k in update_dict and getattr(report, k) != update_dict[k]
+        for k in schedule_keys
+    )
+    account_changed = "meta_account_id" in update_dict and update_dict["meta_account_id"] != report.meta_account_id
+    if account_changed and "specific_campaign_ids" not in update_dict:
+        report.specific_campaign_ids = []
+
     # Handle delivery channels and destination configuration
     delivery_channels = update_dict.pop("delivery_channels", None)
     sheets_url = update_dict.pop("sheets_url", None)
@@ -263,6 +282,10 @@ async def update_report(
             for d in report.destinations:
                 if d.destination_type == "telegram":
                     d.is_enabled = False
+        elif "telegram" in delivery_channels and "telegram" in existing_types:
+            for d in report.destinations:
+                if d.destination_type == "telegram":
+                    d.is_enabled = True
 
         if "google_sheets" in delivery_channels:
             sheet_id = SheetsService.extract_spreadsheet_id(sheets_url or "") if sheets_url else None
@@ -298,8 +321,8 @@ async def update_report(
                 if sheets_tab_name is not None:
                     d.sheets_tab_name = sheets_tab_name
 
-    # If schedule changed, re-calculate next_run_at
-    if any(k in update_dict for k in ("periodicity", "schedule_time", "send_timezone", "schedule_weekday", "schedule_monthday")):
+    # If schedule changed, re-calculate next_run_at; otherwise preserve existing next_run_at
+    if schedule_changed or (report.next_run_at is None and report.is_active):
         report.next_run_at = SchedulerService.calculate_next_run(
             periodicity=report.periodicity,
             schedule_time_str=report.schedule_time,

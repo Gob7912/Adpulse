@@ -1,6 +1,5 @@
-import re
 import logging
-from typing import Optional
+import re
 
 logger = logging.getLogger("adpulse.telegram_links")
 
@@ -12,7 +11,7 @@ USERNAME_REGEX = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 # 1-64 characters, letters, digits, underscores, hyphens
 START_CODE_REGEX = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
-def clean_and_validate_bot_username(raw_username: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+def clean_and_validate_bot_username(raw_username: str | None) -> tuple[str | None, str | None]:
     """
     Cleans and validates a Telegram bot username:
     - Strips whitespace and leading '@'
@@ -37,7 +36,7 @@ def clean_and_validate_bot_username(raw_username: Optional[str]) -> tuple[Option
 
     return cleaned, None
 
-def clean_and_validate_start_code(raw_code: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+def clean_and_validate_start_code(raw_code: str | None) -> tuple[str | None, str | None]:
     """
     Cleans and validates a Telegram start parameter code:
     - Strips whitespace
@@ -57,10 +56,10 @@ def clean_and_validate_start_code(raw_code: Optional[str]) -> tuple[Optional[str
     return cleaned, None
 
 def build_telegram_deep_link(
-    bot_username: Optional[str],
-    start_code: Optional[str],
+    bot_username: str | None,
+    start_code: str | None,
     is_group: bool = False
-) -> Optional[str]:
+) -> str | None:
     """
     Builds the deep-link URL in ONE helper function:
     1. Strips whitespace and a leading '@' from the username.

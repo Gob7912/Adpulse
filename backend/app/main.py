@@ -1,16 +1,17 @@
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.database import engine, Base
 import app.models  # Ensure all models are imported
 from app.api.auth import router as auth_router
-from app.api.meta import router as meta_router
-from app.api.reports import router as reports_router
 from app.api.destinations import router as destinations_router
 from app.api.history import router as history_router
+from app.api.meta import router as meta_router
+from app.api.reports import router as reports_router
+from app.config import settings
+from app.database import Base, engine
 
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,

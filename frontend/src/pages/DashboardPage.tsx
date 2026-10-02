@@ -277,6 +277,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                               onClick={() => handlePause(rep.id)}
                               disabled={actionLoading === rep.id}
                               title={t.dashboard.action_pause}
+                              aria-label={t.dashboard.action_pause}
                               className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-600/10 transition-colors"
                             >
                               <Pause className="w-3.5 h-3.5" />
@@ -286,6 +287,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                               onClick={() => handleResume(rep.id)}
                               disabled={actionLoading === rep.id}
                               title={t.dashboard.action_resume}
+                              aria-label={t.dashboard.action_resume}
                               className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-600/10 transition-colors"
                             >
                               <Play className="w-3.5 h-3.5" />
@@ -293,9 +295,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                           )}
 
                           <button
+                            onClick={() => onEditReport(rep.id)}
+                            disabled={actionLoading === rep.id}
+                            title={t.dashboard.action_edit}
+                            aria-label={t.dashboard.action_edit}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
                             onClick={() => handleDuplicate(rep.id)}
                             disabled={actionLoading === rep.id}
                             title={t.dashboard.action_duplicate}
+                            aria-label={t.dashboard.action_duplicate}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                           >
                             <Copy className="w-3.5 h-3.5" />

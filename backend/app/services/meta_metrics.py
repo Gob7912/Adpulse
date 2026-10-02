@@ -1,5 +1,5 @@
-from typing import Any
 from dataclasses import dataclass
+
 
 @dataclass
 class MetricDefinition:
@@ -442,7 +442,7 @@ def get_default_labels(lang: str = "ru") -> dict[str, str]:
             labels[key] = definition.ru_label
     return labels
 
-def format_metric_value(val: float | int | None, format_type: str, currency: str = "USD", lang: str = "ru") -> str:
+def format_metric_value(val: float | None, format_type: str, currency: str = "USD", lang: str = "ru") -> str:
     if val is None:
         if lang == "uz":
             return "mavjud emas"

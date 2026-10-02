@@ -1,23 +1,24 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from app.database import get_db
-from app.models.user import User
-from app.models.report import Report
-from app.models.destination import Destination
-from app.schemas.destination import (
-    GoogleSheetsVerifyRequest,
-    GoogleSheetsVerifyResponse,
-    GoogleSheetsServiceInfoResponse,
-    DestinationResponse,
-    TelegramBotInfoResponse
-)
-from app.services.sheets_service import sheets_service, SheetsService
-from app.services.telegram_sender import telegram_sender
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import get_current_user
 from app.api.reports import _build_destination_response
+from app.database import get_db
+from app.models.destination import Destination
+from app.models.report import Report
+from app.models.user import User
+from app.schemas.destination import (
+    DestinationResponse,
+    GoogleSheetsServiceInfoResponse,
+    GoogleSheetsVerifyRequest,
+    GoogleSheetsVerifyResponse,
+    TelegramBotInfoResponse,
+)
+from app.services.sheets_service import SheetsService, sheets_service
+from app.services.telegram_sender import telegram_sender
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 

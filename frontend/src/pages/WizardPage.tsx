@@ -109,6 +109,20 @@ export const WizardPage: React.FC<WizardPageProps> = ({
 
   const [serviceAccountEmail, setServiceAccountEmail] = useState<string>('adpulse-service@adpulse-reports.iam.gserviceaccount.com');
 
+  // Edit mode tracking state
+  const [isDirty, setIsDirty] = useState(false);
+  const [accountChangedNotice, setAccountChangedNotice] = useState(false);
+  const initialAccountIdRef = React.useRef<string | null>(null);
+
+  const handleClose = () => {
+    if (isDirty && step !== 5) {
+      if (!window.confirm(t.stepper.unsaved_confirm)) {
+        return;
+      }
+    }
+    onFinish();
+  };
+
   // Load Telegram bot info and Sheets service account email at runtime
   useEffect(() => {
     api.getTelegramBotInfo()
@@ -179,7 +193,10 @@ export const WizardPage: React.FC<WizardPageProps> = ({
           account_status: 1,
         });
 
+        initialAccountIdRef.current = report.meta_account_id;
+        setSelectedTemplate(null);
         setCreatedReport(report);
+        setIsDirty(false);
       } catch (err: any) {
         setError(`Ошибка загрузки отчёта: ${err.message}`);
       } finally {
@@ -284,6 +301,7 @@ export const WizardPage: React.FC<WizardPageProps> = ({
   const handleSelectTemplate = (tmpl: TemplateInfo) => {
     setSelectedTemplate(tmpl.id);
     setSelectedMetrics(tmpl.metrics);
+    setIsDirty(true);
   };
 
   const toggleMetric = (key: string) => {
@@ -291,6 +309,7 @@ export const WizardPage: React.FC<WizardPageProps> = ({
     setSelectedMetrics(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
+    setIsDirty(true);
   };
 
   // Step 4 Validation & Submission to backend
@@ -327,13 +346,20 @@ export const WizardPage: React.FC<WizardPageProps> = ({
       let saved: Report;
       if (editingReportId) {
         saved = await api.updateReport(editingReportId, payload);
+        setIsDirty(false);
+        setCreatedReport(saved);
+        setToast(t.step5.report_updated_toast || 'Отчёт успешно обновлен!');
+        setTimeout(() => {
+          onFinish();
+        }, 1200);
       } else {
         saved = await api.createReport(payload);
+        setIsDirty(false);
+        setCreatedReport(saved);
+        setStep(5);
+        setToast(t.step5.report_created_toast);
+        setTimeout(() => setToast(null), 5000);
       }
-      setCreatedReport(saved);
-      setStep(5);
-      setToast(t.step5.report_created_toast);
-      setTimeout(() => setToast(null), 5000);
     } catch (err: any) {
       setError(err.message || 'Ошибка сохранения отчёта');
     } finally {
@@ -420,23 +446,26 @@ export const WizardPage: React.FC<WizardPageProps> = ({
         {/* Pill Stepper with Close Button */}
         <WizardStepper
           currentStep={step}
-          onStepClick={(s) => {
-            if (s < step) setStep(s);
-          }}
-          onClose={onFinish}
+          isEditing={Boolean(editingReportId)}
+          onStepClick={(s) => setStep(s)}
+          onClose={handleClose}
         />
 
         {/* Step Header */}
         <div className="mb-6">
           <div className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">
-            {t.stepper.step} {step} {t.stepper.of} 5
+            {editingReportId
+              ? `${t.stepper.edit_title} • ${t.stepper.step} ${step} ${t.stepper.of} 5`
+              : `${t.stepper.step} ${step} ${t.stepper.of} 5`}
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            {step === 1 && t.step1.title}
-            {step === 2 && t.step2.title}
-            {step === 3 && t.step3.title}
-            {step === 4 && t.step4.title}
-            {step === 5 && t.step5.title}
+            {editingReportId
+              ? `${t.stepper.edit_title}: ${reportName || createdReport?.name || '...'}`
+              : (step === 1 && t.step1.title) ||
+                (step === 2 && t.step2.title) ||
+                (step === 3 && t.step3.title) ||
+                (step === 4 && t.step4.title) ||
+                t.step5.title}
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             {step === 1 && t.step1.subtitle}
@@ -741,7 +770,16 @@ export const WizardPage: React.FC<WizardPageProps> = ({
                           <div
                             key={acc.id}
                             onClick={() => {
-                              setSelectedAccount(acc);
+                              if (selectedAccount?.id !== acc.id) {
+                                setSelectedAccount(acc);
+                                setSelectedCampaignIds([]);
+                                setIsDirty(true);
+                                if (editingReportId && initialAccountIdRef.current && initialAccountIdRef.current !== acc.id) {
+                                  setAccountChangedNotice(true);
+                                } else {
+                                  setAccountChangedNotice(false);
+                                }
+                              }
                               setAccountDropdownOpen(false);
                             }}
                             className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
@@ -760,6 +798,13 @@ export const WizardPage: React.FC<WizardPageProps> = ({
                   </div>
                 )}
               </div>
+
+              {accountChangedNotice && (
+                <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{t.step2.account_changed_notice}</span>
+                </div>
+              )}
             </div>
 
             {/* c) Campaign Scope */}
@@ -1420,7 +1465,7 @@ export const WizardPage: React.FC<WizardPageProps> = ({
               className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-xs font-semibold text-white transition-colors flex items-center space-x-1.5"
             >
               {loading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-              <span>{t.stepper.save_and_continue}</span>
+              <span>{editingReportId ? t.stepper.save_changes : t.stepper.save_and_continue}</span>
             </button>
           )}
 

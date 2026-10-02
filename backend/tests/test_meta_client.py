@@ -1,6 +1,9 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
-from app.services.meta_client import MetaClient, MetaAPIError, MetaTokenExpiredError
+
+from app.services.meta_client import MetaClient, MetaTokenExpiredError
+
 
 @pytest.mark.asyncio
 async def test_meta_client_verify_token_success():

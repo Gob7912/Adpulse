@@ -1,15 +1,13 @@
 import logging
-from typing import Optional
+
 from aiogram import Bot
-from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramAPIError
 
 from app.config import settings
 from app.services.telegram_links import (
     clean_and_validate_bot_username,
-    clean_and_validate_start_code,
-    build_telegram_deep_link
 )
 
 logger = logging.getLogger("adpulse.telegram_sender")
@@ -25,7 +23,7 @@ class TelegramSender:
             if self.bot_token
             else None
         )
-        self._cached_bot_username: Optional[str] = None
+        self._cached_bot_username: str | None = None
         self._cache_initialized: bool = False
 
     def reset_cache(self):
@@ -33,7 +31,7 @@ class TelegramSender:
         self._cached_bot_username = None
         self._cache_initialized = False
 
-    async def get_runtime_bot_username(self) -> tuple[Optional[str], Optional[str]]:
+    async def get_runtime_bot_username(self) -> tuple[str | None, str | None]:
         """
         Gets the bot username at runtime from Telegram getMe (and caches it).
         Returns (cleaned_username, error_message).

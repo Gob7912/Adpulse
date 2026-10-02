@@ -1,7 +1,7 @@
-import pytest
-from app.services.report_engine import ReportEngine
-from app.services.meta_metrics import format_metric_value, get_default_labels
 from app.config import settings
+from app.services.meta_metrics import format_metric_value, get_default_labels
+from app.services.report_engine import ReportEngine
+
 
 def test_meta_graph_api_version_config():
     assert settings.META_GRAPH_API_VERSION == "v21.0"

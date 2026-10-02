@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
+
 @pytest.mark.asyncio
 async def test_full_wizard_and_user_isolation(client: AsyncClient):
     # 1. Register User A
@@ -129,4 +130,115 @@ async def test_full_wizard_and_user_isolation(client: AsyncClient):
     # 11. Delete report
     del_res = await client.delete(f"/api/reports/{report_id}", headers=headers_a)
     assert del_res.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_report_editing_edge_cases(client: AsyncClient, test_db_session):
+    from sqlalchemy import update
+
+    from app.models.destination import Destination
+
+    # Register Owner
+    reg = await client.post("/api/auth/register", json={"email": "owner@example.com", "password": "password123"})
+    token_owner = reg.json()["access_token"]
+    headers_owner = {"Authorization": f"Bearer {token_owner}"}
+
+    # Register Other User
+    reg_other = await client.post("/api/auth/register", json={"email": "other@example.com", "password": "password123"})
+    token_other = reg_other.json()["access_token"]
+    headers_other = {"Authorization": f"Bearer {token_other}"}
+
+    # Create initial report
+    create_res = await client.post(
+        "/api/reports",
+        json={
+            "name": "Original Report",
+            "meta_account_id": "act_111",
+            "meta_account_name": "Account 1",
+            "periodicity": "daily",
+            "schedule_time": "08:00",
+            "send_timezone": "Asia/Tashkent",
+            "campaign_scope_type": "specific",
+            "specific_campaign_ids": ["camp_1", "camp_2"],
+            "delivery_channels": ["telegram"]
+        },
+        headers=headers_owner
+    )
+    assert create_res.status_code == 201
+    rep = create_res.json()
+    rep_id = rep["id"]
+    orig_next_run = rep["next_run_at"]
+    orig_tg_dest = next(d for d in rep["destinations"] if d["destination_type"] == "telegram")
+    orig_code = orig_tg_dest["one_time_code"]
+
+    # Simulating telegram connected state in DB
+    await test_db_session.execute(
+        update(Destination)
+        .where(Destination.id == orig_tg_dest["id"])
+        .values(telegram_chat_id=12345678, telegram_thread_id=42, is_connected=True, telegram_chat_title="My Group")
+    )
+    await test_db_session.commit()
+
+    # Case a: Paused report stays paused after editing
+    pause_res = await client.post(f"/api/reports/{rep_id}/pause", headers=headers_owner)
+    assert pause_res.status_code == 200
+    assert pause_res.json()["is_active"] is False
+
+    edit_res = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"name": "Still Paused Report"},
+        headers=headers_owner
+    )
+    assert edit_res.status_code == 200
+    assert edit_res.json()["name"] == "Still Paused Report"
+    assert edit_res.json()["is_active"] is False  # (Case a: stays paused)
+
+    # Case b: Telegram connection preserved (chat_id, thread_id, one_time_code not reset)
+    edit_tg = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"delivery_channels": ["telegram"]},
+        headers=headers_owner
+    )
+    assert edit_tg.status_code == 200
+    tg_dest_after = next(d for d in edit_tg.json()["destinations"] if d["destination_type"] == "telegram")
+    assert tg_dest_after["one_time_code"] == orig_code
+    assert tg_dest_after["telegram_chat_id"] == 12345678
+    assert tg_dest_after["telegram_thread_id"] == 42
+    assert tg_dest_after["is_connected"] is True  # (Case b: connection preserved)
+
+    # Case c: next_run_at without schedule change stays unchanged; with schedule change is recalculated
+    edit_name_only = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"name": "Only Name Changed"},
+        headers=headers_owner
+    )
+    assert edit_name_only.status_code == 200
+    assert edit_name_only.json()["next_run_at"] == orig_next_run  # (Case c1: unchanged schedule preserves next_run_at)
+
+    edit_sched = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"schedule_time": "15:00"},
+        headers=headers_owner
+    )
+    assert edit_sched.status_code == 200
+    assert edit_sched.json()["next_run_at"] != orig_next_run  # (Case c2: changed schedule recalculates next_run_at)
+
+    # Case d: Changing ad account resets specific campaigns
+    edit_acc = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"meta_account_id": "act_222", "meta_account_name": "Account 2"},
+        headers=headers_owner
+    )
+    assert edit_acc.status_code == 200
+    assert edit_acc.json()["meta_account_id"] == "act_222"
+    assert edit_acc.json()["specific_campaign_ids"] == []  # (Case d: campaigns from old account reset)
+
+    # Case f: Editing another user's report returns 404
+    edit_other = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"name": "Hacked by User B"},
+        headers=headers_other
+    )
+    assert edit_other.status_code == 404  # (Case f: 404 for non-owner)
+
 
