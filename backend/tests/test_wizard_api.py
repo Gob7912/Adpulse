@@ -223,15 +223,62 @@ async def test_report_editing_edge_cases(client: AsyncClient, test_db_session):
     assert edit_sched.status_code == 200
     assert edit_sched.json()["next_run_at"] != orig_next_run  # (Case c2: changed schedule recalculates next_run_at)
 
-    # Case d: Changing ad account resets specific campaigns
+    # Case d & Point 2: Changing ad account updates currency, account_timezone, and recalculates next_run_at
+    prev_next_run = edit_sched.json()["next_run_at"]
     edit_acc = await client.put(
         f"/api/reports/{rep_id}",
-        json={"meta_account_id": "act_222", "meta_account_name": "Account 2"},
+        json={
+            "meta_account_id": "act_222",
+            "meta_account_name": "Account 2",
+            "currency": "EUR",
+            "account_timezone": "America/Los_Angeles"
+        },
         headers=headers_owner
     )
     assert edit_acc.status_code == 200
     assert edit_acc.json()["meta_account_id"] == "act_222"
+    assert edit_acc.json()["currency"] == "EUR"  # Currency updated from new account
+    assert edit_acc.json()["account_timezone"] == "America/Los_Angeles"  # Timezone updated from new account
     assert edit_acc.json()["specific_campaign_ids"] == []  # (Case d: campaigns from old account reset)
+    assert edit_acc.json()["next_run_at"] != prev_next_run  # next_run_at recalculated for new timezone
+
+    # Point 3: Remove Telegram, save, then add back
+    # 1. User removes Telegram from delivery channels
+    rem_tg = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"delivery_channels": ["google_sheets"], "sheets_url": "https://docs.google.com/spreadsheets/d/abc123/edit"},
+        headers=headers_owner
+    )
+    assert rem_tg.status_code == 200
+    tg_disabled = next(d for d in rem_tg.json()["destinations"] if d["destination_type"] == "telegram")
+    assert tg_disabled["is_enabled"] is False
+
+    # 2. User adds Telegram back -> without duplicate Destination, chat_id & thread_id restored
+    add_tg = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"delivery_channels": ["telegram", "google_sheets"]},
+        headers=headers_owner
+    )
+    assert add_tg.status_code == 200
+    tg_dests_after = [d for d in add_tg.json()["destinations"] if d["destination_type"] == "telegram"]
+    assert len(tg_dests_after) == 1  # No duplicate rows
+    assert tg_dests_after[0]["is_enabled"] is True
+    assert tg_dests_after[0]["telegram_chat_id"] == 12345678  # chat_id restored
+    assert tg_dests_after[0]["telegram_thread_id"] == 42  # thread_id restored
+    assert tg_dests_after[0]["is_connected"] is True
+    assert tg_dests_after[0]["one_time_code"] == orig_code
+
+    # 3. Optional user action to unlink / reset code generates new code
+    reset_tg = await client.put(
+        f"/api/reports/{rep_id}",
+        json={"reset_telegram_code": True},
+        headers=headers_owner
+    )
+    assert reset_tg.status_code == 200
+    tg_reset = next(d for d in reset_tg.json()["destinations"] if d["destination_type"] == "telegram")
+    assert tg_reset["telegram_chat_id"] is None
+    assert tg_reset["is_connected"] is False
+    assert tg_reset["one_time_code"] != orig_code
 
     # Case f: Editing another user's report returns 404
     edit_other = await client.put(

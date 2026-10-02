@@ -140,6 +140,9 @@ export const ru = {
     test_sent_toast: 'Тестовый отчёт отправлен!',
     connected_status: 'Подключено',
     status_updated_toast: 'Статус подключений обновлен',
+    tg_restored: 'Привязка к Telegram восстановлена. Бот продолжит отправку в этот чат.',
+    tg_reset_btn: 'Привязать другой чат',
+    tg_reset_toast: 'Привязка сброшена. Сгенерирован новый код.',
   },
   dashboard: {
     title: 'Мои отчёты',

@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import timezone
 
@@ -13,6 +14,8 @@ from app.models.destination import Destination
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.destination import DestinationResponse
+from app.security import decrypt_secret
+from app.services.meta_client import MetaClient
 from app.schemas.report import (
     ReportCreateRequest,
     ReportLivePreviewRequest,
@@ -32,6 +35,7 @@ from app.services.telegram_links import (
 from app.services.telegram_sender import telegram_sender
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+logger = logging.getLogger("adpulse.reports")
 
 def _build_destination_response(dest: Destination, bot_username: str | None = None) -> DestinationResponse:
     deep_link_personal = None
@@ -254,43 +258,74 @@ async def update_report(
         for k in schedule_keys
     )
     account_changed = "meta_account_id" in update_dict and update_dict["meta_account_id"] != report.meta_account_id
-    if account_changed and "specific_campaign_ids" not in update_dict:
-        report.specific_campaign_ids = []
+    if account_changed:
+        if "specific_campaign_ids" not in update_dict:
+            report.specific_campaign_ids = []
+        schedule_changed = True
+
+        # If currency or account_timezone not passed, fetch from Meta
+        new_account_id = update_dict["meta_account_id"]
+        if ("currency" not in update_dict or "account_timezone" not in update_dict) and user.meta_connection and user.meta_connection.encrypted_access_token:
+            try:
+                raw_token = decrypt_secret(user.meta_connection.encrypted_access_token)
+                meta_client = MetaClient(access_token=raw_token)
+                accs = await meta_client.get_ad_accounts()
+                target_acc = next((a for a in accs if a["id"] == new_account_id or a.get("account_id") == new_account_id), None)
+                if target_acc:
+                    if "currency" not in update_dict and target_acc.get("currency"):
+                        update_dict["currency"] = target_acc["currency"]
+                    if "account_timezone" not in update_dict and target_acc.get("timezone_name"):
+                        update_dict["account_timezone"] = target_acc["timezone_name"]
+            except Exception as e:
+                logger.warning(f"Could not fetch account metadata from Meta for {new_account_id}: {e}")
 
     # Handle delivery channels and destination configuration
     delivery_channels = update_dict.pop("delivery_channels", None)
     sheets_url = update_dict.pop("sheets_url", None)
     sheets_tab_name = update_dict.pop("sheets_tab_name", None)
+    reset_telegram = update_dict.pop("reset_telegram_code", False)
 
     for k, v in update_dict.items():
         setattr(report, k, v)
 
     # If destinations need update
     if delivery_channels is not None:
-        existing_types = {d.destination_type: d for d in report.destinations}
-        if "telegram" in delivery_channels and "telegram" not in existing_types:
-            one_time_code = secrets.token_hex(16)
-            db.add(Destination(
-                report_id=report.id,
-                destination_type="telegram",
-                is_enabled=True,
-                telegram_target_type="personal",
-                one_time_code=one_time_code,
-                is_connected=False
-            ))
-        elif "telegram" not in delivery_channels and "telegram" in existing_types:
-            for d in report.destinations:
-                if d.destination_type == "telegram":
-                    d.is_enabled = False
-        elif "telegram" in delivery_channels and "telegram" in existing_types:
-            for d in report.destinations:
-                if d.destination_type == "telegram":
-                    d.is_enabled = True
+        telegram_dests = [d for d in report.destinations if d.destination_type == "telegram"]
+        if "telegram" in delivery_channels:
+            if not telegram_dests:
+                one_time_code = secrets.token_hex(16)
+                db.add(Destination(
+                    report_id=report.id,
+                    destination_type="telegram",
+                    is_enabled=True,
+                    telegram_target_type="personal",
+                    one_time_code=one_time_code,
+                    is_connected=False
+                ))
+            else:
+                primary = telegram_dests[0]
+                primary.is_enabled = True
+                if reset_telegram:
+                    primary.telegram_chat_id = None
+                    primary.telegram_thread_id = None
+                    primary.telegram_chat_title = None
+                    primary.is_connected = False
+                    primary.one_time_code = secrets.token_hex(16)
+                else:
+                    if not primary.one_time_code:
+                        primary.one_time_code = secrets.token_hex(16)
+                    if primary.telegram_chat_id:
+                        primary.is_connected = True
+                for extra in telegram_dests[1:]:
+                    extra.is_enabled = False
+        else:
+            for d in telegram_dests:
+                d.is_enabled = False
 
+        sheets_dests = [d for d in report.destinations if d.destination_type == "google_sheets"]
         if "google_sheets" in delivery_channels:
             sheet_id = SheetsService.extract_spreadsheet_id(sheets_url or "") if sheets_url else None
-            sheets_dest = existing_types.get("google_sheets")
-            if not sheets_dest:
+            if not sheets_dests:
                 db.add(Destination(
                     report_id=report.id,
                     destination_type="google_sheets",
@@ -301,15 +336,27 @@ async def update_report(
                     is_connected=bool(sheet_id)
                 ))
             else:
-                sheets_dest.is_enabled = True
+                primary_sheets = sheets_dests[0]
+                primary_sheets.is_enabled = True
                 if sheets_url is not None:
-                    sheets_dest.sheets_url = sheets_url
-                    sheets_dest.sheets_spreadsheet_id = sheet_id
-                    sheets_dest.is_connected = bool(sheet_id)
+                    primary_sheets.sheets_url = sheets_url
+                    primary_sheets.sheets_spreadsheet_id = sheet_id
+                    primary_sheets.is_connected = bool(sheet_id)
                 if sheets_tab_name is not None:
-                    sheets_dest.sheets_tab_name = sheets_tab_name
-        elif "google_sheets" not in delivery_channels and "google_sheets" in existing_types:
-            existing_types["google_sheets"].is_enabled = False
+                    primary_sheets.sheets_tab_name = sheets_tab_name
+                for extra in sheets_dests[1:]:
+                    extra.is_enabled = False
+        else:
+            for d in sheets_dests:
+                d.is_enabled = False
+    elif reset_telegram:
+        for d in report.destinations:
+            if d.destination_type == "telegram":
+                d.telegram_chat_id = None
+                d.telegram_thread_id = None
+                d.telegram_chat_title = None
+                d.is_connected = False
+                d.one_time_code = secrets.token_hex(16)
     else:
         # Update sheets url/tab if explicitly provided without changing channels
         for d in report.destinations:
@@ -321,8 +368,8 @@ async def update_report(
                 if sheets_tab_name is not None:
                     d.sheets_tab_name = sheets_tab_name
 
-    # If schedule changed, re-calculate next_run_at; otherwise preserve existing next_run_at
-    if schedule_changed or (report.next_run_at is None and report.is_active):
+    # If schedule or account changed, re-calculate next_run_at; otherwise preserve existing next_run_at
+    if schedule_changed or account_changed or (report.next_run_at is None and report.is_active):
         report.next_run_at = SchedulerService.calculate_next_run(
             periodicity=report.periodicity,
             schedule_time_str=report.schedule_time,

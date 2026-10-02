@@ -108,23 +108,34 @@ docker compose up -d --build
 
 ---
 
-## 🧪 Запуск тестов
+## 🧪 Запуск тестов и линтера
 
-Для проверки математики метрик, планировщика, генерации сообщений и API запустите pytest:
+Боевые образы `api` и `worker` ставят только необходимые для работы зависимости из `requirements.txt`. Инструменты разработки и тестирования (`aiosqlite`, `ruff` и др.) вынесены в `backend/requirements-dev.txt`.
+
+### Локальный запуск:
 
 ```bash
 cd backend
 source venv/bin/activate
-pytest tests/ -v
+pip install -r requirements-dev.txt
+PYTHONPATH=. pytest -v
+ruff check .
 ```
 
-Все 43 теста покрывают:
+### Запуск через Docker:
+
+```bash
+docker compose run --rm -v "$(pwd)/backend":/app -w /app api sh -c "pip install -r requirements-dev.txt && PYTHONPATH=. pytest -v && ruff check ."
+```
+
+Все 44 теста покрывают:
 - Строгий расчёт соотношений без усреднения (CTR, CPC, CPM, CPP, CPL, Cost per DM, ROAS).
 - Защиту от деления на ноль при пустых кампаниях.
 - Задержку финальных данных (Final data delay 6h) с учётом часовых поясов.
 - Пагинацию и обработку ошибок Meta API (Error 190 / Token Expired).
 - Генерацию HTML-сообщений для Telegram и форматирование строк Google Sheets.
 - Изоляцию пользователей и полный цикл мастера создания отчётов.
+- Краевые случаи редактирования отчётов, смену аккаунтов и сохранение привязок Telegram.
 
 ---
 

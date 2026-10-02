@@ -109,23 +109,34 @@ Once started, the application is accessible at:
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing & Linting
 
-Run unit and integration tests using pytest:
+Production Docker images for `api` and `worker` install runtime dependencies from `requirements.txt`. Test and developer dependencies (`aiosqlite`, `ruff`) are isolated in `backend/requirements-dev.txt`.
+
+### Local Execution:
 
 ```bash
 cd backend
 source venv/bin/activate
-PYTHONPATH=. pytest tests/ -v
+pip install -r requirements-dev.txt
+PYTHONPATH=. pytest -v
+ruff check .
 ```
 
-All 43 tests cover:
+### Docker Execution:
+
+```bash
+docker compose run --rm -v "$(pwd)/backend":/app -w /app api sh -c "pip install -r requirements-dev.txt && PYTHONPATH=. pytest -v && ruff check ."
+```
+
+All 44 tests cover:
 - Metric math and zero-division resilience without ratio averaging.
 - Final data delay buffer (6h) with account timezone handling.
 - Meta API client mocking, pagination, and Error 190 (Token Expired) handling.
 - Telegram deep-link sanitization, topic/thread delivery, and error alerts.
 - Dynamic Google Sheets tab discovery and numeric cell formatting.
 - User data isolation and end-to-end report wizard workflows.
+- Report editing, account switching, and destination restoration edge cases.
 
 ---
 

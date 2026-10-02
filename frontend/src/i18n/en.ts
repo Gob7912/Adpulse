@@ -140,6 +140,9 @@ export const en = {
     test_sent_toast: 'Test report dispatched successfully!',
     connected_status: 'Connected',
     status_updated_toast: 'Connection status refreshed',
+    tg_restored: 'Telegram connection restored. The bot will continue sending reports to this chat.',
+    tg_reset_btn: 'Link different chat',
+    tg_reset_toast: 'Connection reset. New code generated.',
   },
   dashboard: {
     title: 'My Reports',

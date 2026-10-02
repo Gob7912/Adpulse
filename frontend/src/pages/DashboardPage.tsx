@@ -163,8 +163,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-800/80">
                 {reports.map((rep) => {
-                  const tgDest = rep.destinations.find(d => d.destination_type === 'telegram');
-                  const sheetsDest = rep.destinations.find(d => d.destination_type === 'google_sheets');
+                  const tgDest = rep.destinations.find(d => d.destination_type === 'telegram' && d.is_enabled);
+                  const sheetsDest = rep.destinations.find(d => d.destination_type === 'google_sheets' && d.is_enabled);
                   const RowIcon = getReportTypeIcon(null, {
                     metrics: rep.metrics,
                     goals: rep.campaign_filter_goals

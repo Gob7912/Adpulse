@@ -54,6 +54,7 @@ class ReportUpdateRequest(BaseModel):
     delivery_channels: list[str] | None = None
     sheets_url: str | None = None
     sheets_tab_name: str | None = None
+    reset_telegram_code: bool | None = None
 
 class ReportResponse(BaseModel):
     id: str

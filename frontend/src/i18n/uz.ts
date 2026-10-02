@@ -140,6 +140,9 @@ export const uz = {
     test_sent_toast: 'Test hisoboti muvaffaqiyatli yuborildi!',
     connected_status: 'Ulangan',
     status_updated_toast: 'Ulanish holati yangilandi',
+    tg_restored: 'Telegram ulanishi tiklandi. Bot hisobotlarni ushbu chatga yuborishda davom etadi.',
+    tg_reset_btn: 'Boshqa chatni ulash',
+    tg_reset_toast: 'Ulanish bekor qilindi. Yangi kod yaratildi.',
   },
   dashboard: {
     title: 'Hisobotlarim',

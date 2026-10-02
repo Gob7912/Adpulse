@@ -172,12 +172,10 @@ export const WizardPage: React.FC<WizardPageProps> = ({
 
         const channels: ('telegram' | 'google_sheets')[] = [];
         report.destinations.forEach((d) => {
-          if (d.destination_type === 'telegram' && !channels.includes('telegram')) channels.push('telegram');
-          if (d.destination_type === 'google_sheets' && !channels.includes('google_sheets')) channels.push('google_sheets');
+          if (d.destination_type === 'telegram' && d.is_enabled && !channels.includes('telegram')) channels.push('telegram');
+          if (d.destination_type === 'google_sheets' && d.is_enabled && !channels.includes('google_sheets')) channels.push('google_sheets');
         });
-        if (channels.length > 0) {
-          setDeliveryChannels(channels);
-        }
+        setDeliveryChannels(channels);
 
         const sheets = report.destinations.find((d) => d.destination_type === 'google_sheets');
         if (sheets) {
@@ -427,9 +425,25 @@ export const WizardPage: React.FC<WizardPageProps> = ({
   const canGoNextFromStep3 = selectedMetrics.length > 0;
   const canSaveFromStep4 = Boolean(selectedAccount);
 
+  const handleResetTelegramConnection = async () => {
+    if (!createdReport) return;
+    try {
+      setLoading(true);
+      const updated = await api.updateReport(createdReport.id, { reset_telegram_code: true });
+      setCreatedReport(updated);
+      setToast(t.step5.tg_reset_toast || 'Привязка сброшена. Сгенерирован новый код.');
+      setTimeout(() => setToast(null), 4000);
+    } catch (err: any) {
+      setError(`Ошибка сброса привязки: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Telegram destination details from createdReport
-  const telegramDest = createdReport?.destinations.find(d => d.destination_type === 'telegram');
-  const sheetsDest = createdReport?.destinations.find(d => d.destination_type === 'google_sheets');
+  const telegramDest = createdReport?.destinations.find(d => d.destination_type === 'telegram' && d.is_enabled);
+  const sheetsDest = createdReport?.destinations.find(d => d.destination_type === 'google_sheets' && d.is_enabled);
+  const prevConnectedTg = createdReport?.destinations.find(d => d.destination_type === 'telegram' && d.is_connected);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -586,7 +600,9 @@ export const WizardPage: React.FC<WizardPageProps> = ({
                   </div>
                   <div>
                     <div className="font-semibold text-xs text-white">Telegram</div>
-                    <div className="text-[10px] text-slate-400">Личка, группа, темы</div>
+                    <div className="text-[10px] text-slate-400">
+                      {editingReportId && prevConnectedTg ? `✓ ${prevConnectedTg.telegram_chat_title || 'Подключён'}` : 'Личка, группа, темы'}
+                    </div>
                   </div>
                 </div>
 
@@ -1235,8 +1251,21 @@ export const WizardPage: React.FC<WizardPageProps> = ({
                     </div>
 
                     {telegramDest?.is_connected ? (
-                      <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs text-center font-medium">
-                        ✓ {t.step5.connected_status || 'Connected'}: {telegramDest.telegram_chat_title || 'Telegram'}
+                      <div className="space-y-2">
+                        <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs text-center font-medium">
+                          ✓ {t.step5.connected_status || 'Connected'}: {telegramDest.telegram_chat_title || 'Telegram'}
+                        </div>
+                        <p className="text-[11px] text-slate-400 text-center">
+                          {t.step5.tg_restored}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleResetTelegramConnection}
+                          disabled={loading}
+                          className="w-full py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-[11px] text-slate-300 transition-colors"
+                        >
+                          {t.step5.tg_reset_btn}
+                        </button>
                       </div>
                     ) : (
                       <div className="space-y-1.5">
