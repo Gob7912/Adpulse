@@ -1,5 +1,8 @@
 
-from pydantic import Field
+import json
+from typing import Any
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = "AdPulse"
@@ -33,6 +36,10 @@ class Settings(BaseSettings):
     
     # Meta Graph API
     META_GRAPH_API_VERSION: str = Field(default="v21.0", description="Supported Meta Marketing / Graph API Version")
+    META_USE_ACCOUNT_ATTRIBUTION_SETTING: bool = Field(
+        default=True,
+        description="Whether to query Insights using the ad account attribution setting"
+    )
     
     @property
     def META_GRAPH_API_BASE(self) -> str:
@@ -53,9 +60,47 @@ class Settings(BaseSettings):
     GOOGLE_SERVICE_ACCOUNT_JSON: str | None = None
     GOOGLE_SERVICE_ACCOUNT_EMAIL: str | None = None
     
-    # CORS
-    CORS_ORIGINS: list[str] = ["*"]
-    
+    # CORS: Explicit origins required when allow_credentials=True
+    CORS_ORIGINS: list[str] = Field(
+        default=[
+            "http://localhost",
+            "https://localhost",
+            "http://localhost:80",
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1",
+            "http://127.0.0.1:80",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+        ],
+        description="Allowed CORS origin URLs"
+    )
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            v_clean = v.strip()
+            if v_clean.startswith("["):
+                try:
+                    return json.loads(v_clean)
+                except Exception:
+                    pass
+            return [i.strip() for i in v_clean.split(",") if i.strip()]
+        elif isinstance(v, list):
+            return v
+        return [
+            "http://localhost",
+            "https://localhost",
+            "http://localhost:80",
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1",
+            "http://127.0.0.1:80",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+        ]
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

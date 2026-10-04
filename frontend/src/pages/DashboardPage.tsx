@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Report } from '../types';
 import {
@@ -12,6 +13,7 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertTriangle,
+  MinusCircle,
   Clock,
   ExternalLink,
   Edit2
@@ -30,6 +32,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onViewHistory,
 }) => {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -99,8 +102,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const handleSendNow = async (id: string) => {
     setActionLoading(id);
     try {
-      await api.triggerTestSend(id);
-      alert(t.dashboard.toast_send_success);
+      const res: any = await api.triggerTestSend(id);
+      if (res && res.status === 'failed') {
+        alert(t.dashboard.toast_send_error + (res.error || res.message || 'Meta error'));
+      } else {
+        alert(t.dashboard.toast_send_success);
+      }
       await loadReports();
     } catch (err: any) {
       alert(t.dashboard.toast_send_error + (err.message || ''));
@@ -111,6 +118,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* Warning banner when Meta token is expired / invalid */}
+      {user && user.has_meta_connection && user.is_meta_valid === false && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
+          <div className="flex items-center space-x-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-bold">{t.dashboard.token_expired_banner_title || 'Токен Meta Ads устарел или недействителен (код 190)'}</p>
+              <p className="text-amber-400/80 mt-0.5">{t.dashboard.token_expired_banner_desc || 'Автоматическая отправка отчетов приостановлена. Обновите токен доступа для возобновления работы.'}</p>
+            </div>
+          </div>
+          <button
+            onClick={onCreateReport}
+            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-colors shrink-0 ml-4 shadow-sm"
+          >
+            {t.dashboard.token_expired_banner_btn || 'Обновить токен'}
+          </button>
+        </div>
+      )}
+
       {/* Dashboard Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -249,6 +275,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                           <span className="text-emerald-400 flex items-center space-x-1">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>{t.history.status_success}</span>
+                          </span>
+                        ) : rep.last_run_status === 'no_data' ? (
+                          <span className="text-amber-400/90 flex items-center space-x-1">
+                            <MinusCircle className="w-3.5 h-3.5" />
+                            <span>{t.history.status_no_data}</span>
                           </span>
                         ) : rep.last_run_status === 'failed' ? (
                           <span className="text-rose-400 flex items-center space-x-1" title={rep.last_run_error || ''}>

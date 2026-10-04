@@ -142,3 +142,200 @@ def test_default_labels_translations():
     assert ru["leads"] == "Лиды"
     assert uz["leads"] == "Lidlar"
     assert en["leads"] == "Leads"
+
+
+def test_calls_and_profile_visits_actions_parsing():
+    """
+    Verifies that:
+    1. 'Calls placed' via onsite_conversion.lead_grouped or click-to-call returns 4 calls with $3.05 cost.
+    2. 'Profile and Page visits' returns 100 visits.
+    3. Spend is $14.57.
+    4. Messages is None (no ghost data).
+    """
+    live_today_insight = {
+        "spend": "14.57",
+        "impressions": "5200",
+        "clicks": "120",
+        "inline_link_clicks": "100",
+        "reach": "4800",
+        "actions": [
+            {"action_type": "onsite_conversion.lead_grouped", "value": "4"},
+            {"action_type": "profile_visit", "value": "100"}
+        ],
+        "cost_per_action_type": [
+            {"action_type": "onsite_conversion.lead_grouped", "value": "3.05"}
+        ]
+    }
+
+    metrics = ReportEngine.compute_aggregated_metrics(live_today_insight)
+
+    assert metrics["spend"] == 14.57
+    assert metrics["calls"] == 4
+    assert metrics["cost_per_call"] == 3.05
+    assert metrics["profile_visits"] == 100
+    assert metrics["messages"] is None
+    assert metrics["cost_per_dm"] is None
+    assert "calls" in metrics["approximate_metrics"]
+    assert "cost_per_call" in metrics["approximate_metrics"]
+    # profile_visit was exact ('profile_visit'), so not approximate
+    assert "profile_visits" not in metrics["approximate_metrics"]
+
+
+def test_approximate_fallbacks_and_telegram_formatting():
+    """
+    Verifies that fallback profile visits from link clicks and calls from lead_grouped
+    are flagged in approximate_metrics and formatted with ≈ in Telegram.
+    """
+    raw_insight = {
+        "spend": "10.00",
+        "impressions": "1000",
+        "clicks": "50",
+        "inline_link_clicks": "50",
+        "reach": "900",
+        "actions": [
+            {"action_type": "onsite_conversion.lead_grouped", "value": "2"},
+            {"action_type": "link_click", "value": "50"}
+        ]
+    }
+
+    metrics = ReportEngine.compute_aggregated_metrics(raw_insight)
+    assert metrics["calls"] == 2
+    assert metrics["profile_visits"] == 50
+    assert "calls" in metrics["approximate_metrics"]
+    assert "cost_per_call" in metrics["approximate_metrics"]
+    assert "profile_visits" in metrics["approximate_metrics"]
+
+    msg = ReportEngine.build_telegram_message(
+        report_name="Fallback Test",
+        account_name="Test Account",
+        currency="USD",
+        periodicity="daily",
+        since_date="2026-10-04",
+        until_date="2026-10-04",
+        selected_metrics=["calls", "cost_per_call", "profile_visits"],
+        metric_values=metrics,
+        lang="ru"
+    )
+
+    assert "• <b>Звонки</b>: <code>≈ 2</code>" in msg
+    assert "• <b>Стоимость звонка</b>: <code>≈ $5.00</code>" in msg
+    assert "• <b>Посещения профиля</b>: <code>≈ 50</code>" in msg
+
+
+def test_roas_deduplication_purchase_and_omni_purchase():
+    """
+    Ensures that when Meta returns both 'omni_purchase' and 'purchase' in action_values,
+    they are deduplicated rather than summed, preventing ROAS from doubling.
+    """
+    raw_insight = {
+        "spend": "100.00",
+        "impressions": "5000",
+        "action_values": [
+            {"action_type": "omni_purchase", "value": "200.00"},
+            {"action_type": "purchase", "value": "200.00"},
+            {"action_type": "offsite_conversion.fb_pixel_purchase", "value": "200.00"}
+        ]
+    }
+    metrics = ReportEngine.compute_aggregated_metrics(raw_insight)
+    # Revenue is 200, spend is 100 -> ROAS must be 2.0, NOT 6.0
+    assert metrics["roas"] == 2.0
+
+
+def test_roas_with_purchase_roas_meta_field():
+    """
+    Ensures that purchase_roas field returned directly by Meta API takes precedence
+    or is matched cleanly.
+    """
+    raw_insight = {
+        "spend": "100.00",
+        "impressions": "5000",
+        "action_values": [
+            {"action_type": "omni_purchase", "value": "200.00"}
+        ],
+        "purchase_roas": [
+            {"action_type": "omni_purchase", "value": "2.85"}
+        ]
+    }
+    metrics = ReportEngine.compute_aggregated_metrics(raw_insight)
+    assert metrics["roas"] == 2.85
+
+
+def test_calls_placed_action_type_and_cost_parity():
+    """
+    Ensures that 'Calls placed' in Ads Manager corresponds to 'click_to_call_native_call_placed' (19)
+    rather than older 'click_to_call_call_confirm' (16), and matches cost_per_call $1.99.
+    Real data from closed day 2026-10-03 (Call campaign).
+    """
+    raw_insight = {
+        "spend": "37.81",
+        "impressions": "27145",
+        "clicks": "210",
+        "inline_link_clicks": "61",
+        "reach": "24051",
+        "actions": [
+            {"action_type": "click_to_call_native_call_placed", "value": "19"},
+            {"action_type": "click_to_call_call_confirm", "value": "16"},
+            {"action_type": "call_confirm_grouped", "value": "16"},
+            {"action_type": "link_click", "value": "61"},
+        ],
+        "cost_per_action_type": [
+            {"action_type": "click_to_call_native_call_placed", "value": "1.99"},
+            {"action_type": "click_to_call_call_confirm", "value": "2.363125"},
+            {"action_type": "call_confirm_grouped", "value": "2.363125"},
+        ],
+    }
+
+    metrics = ReportEngine.compute_aggregated_metrics(raw_insight)
+
+    assert metrics["calls"] == 19
+    assert metrics["cost_per_call"] == 1.99
+    assert "calls" not in metrics["approximate_metrics"]
+    assert "cost_per_call" not in metrics["approximate_metrics"]
+
+
+def test_profile_visits_results_indicator_and_mixed_fallback():
+    """
+    Verifies that:
+    1. When Meta provides 'total_profile_visits' in the 'results' field (391), it is parsed as exact.
+    2. When Meta returns 'mixed' indicator at account level without profile action, it falls back to link_click (416) with ≈.
+    Real data from closed day 2026-10-03 (VP campaign & account level).
+    """
+    # 1. Exact from results field (single campaign or filtered level)
+    vp_insight = {
+        "spend": "8.64",
+        "impressions": "24891",
+        "clicks": "357",
+        "inline_link_clicks": "355",
+        "reach": "24891",
+        "results": [
+            {"indicator": "total_profile_visits", "values": [{"value": "391"}]}
+        ],
+        "actions": [
+            {"action_type": "link_click", "value": "355"}
+        ],
+    }
+    vp_metrics = ReportEngine.compute_aggregated_metrics(vp_insight)
+    assert vp_metrics["profile_visits"] == 391
+    assert "profile_visits" not in vp_metrics["approximate_metrics"]
+
+    # 2. Mixed fallback at account level
+    mixed_account_insight = {
+        "spend": "46.45",
+        "impressions": "52036",
+        "clicks": "567",
+        "inline_link_clicks": "416",
+        "reach": "48755",
+        "results": [
+            {"indicator": "mixed"}
+        ],
+        "actions": [
+            {"action_type": "link_click", "value": "416"},
+            {"action_type": "click_to_call_native_call_placed", "value": "19"},
+        ],
+    }
+    acc_metrics = ReportEngine.compute_aggregated_metrics(mixed_account_insight)
+    assert acc_metrics["calls"] == 19
+    assert acc_metrics["profile_visits"] == 416
+    assert "calls" not in acc_metrics["approximate_metrics"]
+    assert "profile_visits" in acc_metrics["approximate_metrics"]
+

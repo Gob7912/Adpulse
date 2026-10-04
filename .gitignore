@@ -23,6 +23,20 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+.ruff_cache/
+.mypy_cache/
+
+# Databases & local dumps
+*.db
+*.sqlite
+*.sqlite3
+pgdata/
+dump.rdb
+scratch/
+
+# Logs
+*.log
+logs/
 
 # Frontend build
 frontend/dist/
@@ -34,3 +48,20 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Local documentation & audit scripts
+docs/
+scripts/
+
+# Archive & dump files
+*.tgz
+*.zip
+*.sql
+*.dump
+backups/
+
+# Local overrides & frontend caches
+docker-compose.override.yml
+.vite/
+*.tsbuildinfo
+

@@ -104,6 +104,8 @@ export const ru = {
       'Воскресенье (Sunday)',
     ],
     day_suffix: '-е число месяца',
+    show_comparison_label: 'Сравнение с предыдущим периодом',
+    show_comparison_desc: 'Показывать динамику изменений (▲/▼) рядом со значениями метрик',
   },
   step5: {
     title: 'Подключение',
@@ -175,6 +177,9 @@ export const ru = {
     toast_send_success: 'Отчёт запущен! Результат отправлен в подключенные каналы.',
     toast_send_error: 'Ошибка отправки отчёта: ',
     toast_delete_error: 'Ошибка удаления отчёта: ',
+    token_expired_banner_title: 'Токен Meta Ads устарел или недействителен (код 190)',
+    token_expired_banner_desc: 'Автоматическая отправка отчетов приостановлена. Обновите токен доступа для возобновления работы.',
+    token_expired_banner_btn: 'Обновить токен',
   },
   topbar: {
     logged_as: 'Вы вошли как',
@@ -214,6 +219,7 @@ export const ru = {
     th_duration: 'Время работы',
     th_details: 'Детали / Ошибки',
     status_success: 'Успешно',
+    status_no_data: 'Нет расхода',
     status_partial: 'Частично',
     status_failed: 'Ошибка',
     sec: 'сек',

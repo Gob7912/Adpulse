@@ -104,6 +104,8 @@ export const uz = {
       'Yakshanba (Sunday)',
     ],
     day_suffix: '-kuni',
+    show_comparison_label: 'Oldingi davr bilan taqqoslash',
+    show_comparison_desc: "Ko'rsatkichlar yonida o'zgarishlar dinamikasini (▲/▼) ko'rsatish",
   },
   step5: {
     title: 'Ulanish',
@@ -175,6 +177,9 @@ export const uz = {
     toast_send_success: 'Hisobot ishga tushirildi! Natija ulangan kanallarga yuborildi.',
     toast_send_error: 'Hisobotni yuborishda xatolik: ',
     toast_delete_error: 'Hisobotni o\'chirishda xatolik: ',
+    token_expired_banner_title: 'Meta Ads tokeni muddati o\'tgan yoki yaroqsiz (kod 190)',
+    token_expired_banner_desc: 'Hisobotlarni avtomatik yuborish to\'xtatildi. Ishni davom ettirish uchun kirish tokenini yangilang.',
+    token_expired_banner_btn: 'Tokenni yangilash',
   },
   topbar: {
     logged_as: 'Tizimga kirilgan:',
@@ -214,6 +219,7 @@ export const uz = {
     th_duration: 'Davomiyligi',
     th_details: 'Tafsilotlar / Xatolar',
     status_success: 'Muvaffaqiyatli',
+    status_no_data: "Xarajat yo'q",
     status_partial: 'Qisman',
     status_failed: 'Xatolik',
     sec: 'son',

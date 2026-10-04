@@ -7,6 +7,7 @@ export interface User {
   is_active: boolean;
   created_at: string;
   has_meta_connection: boolean;
+  is_meta_valid?: boolean;
   meta_user_name?: string | null;
   meta_avatar_url?: string | null;
 }
@@ -110,6 +111,7 @@ export interface Report {
   schedule_weekday?: number | null;
   schedule_monthday?: number | null;
   send_timezone: string;
+  show_comparison?: boolean;
   is_active: boolean;
   next_run_at?: string | null;
   last_run_at?: string | null;
@@ -127,7 +129,8 @@ export interface RunHistory {
   period_type: string;
   period_start: string;
   period_end: string;
-  status: 'success' | 'failed' | 'partial';
+  status: 'success' | 'failed' | 'partial' | 'no_data';
+  is_test?: boolean;
   duration_seconds: number;
   metrics_data: Record<string, any>;
   telegram_delivered: boolean;
@@ -164,6 +167,7 @@ export interface WizardState {
   scheduleWeekday: number;
   scheduleMonthday: number;
   sendTimezone: string;
+  showComparison: boolean;
 
   // Step 5 (Created report & destinations)
   createdReport: Report | null;

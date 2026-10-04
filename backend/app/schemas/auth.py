@@ -17,6 +17,7 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     has_meta_connection: bool = False
+    is_meta_valid: bool = True
     meta_user_name: str | None = None
     meta_avatar_url: str | None = None
 

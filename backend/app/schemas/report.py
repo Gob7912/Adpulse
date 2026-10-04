@@ -25,6 +25,7 @@ class ReportCreateRequest(BaseModel):
     schedule_weekday: int | None = None
     schedule_monthday: int | None = None
     send_timezone: str = "Asia/Tashkent"
+    show_comparison: bool = True
     
     # Destination setup from Step 1 & Step 5
     delivery_channels: list[str] = ["telegram"]  # 'telegram', 'google_sheets'
@@ -50,6 +51,7 @@ class ReportUpdateRequest(BaseModel):
     schedule_weekday: int | None = None
     schedule_monthday: int | None = None
     send_timezone: str | None = None
+    show_comparison: bool | None = None
     is_active: bool | None = None
     delivery_channels: list[str] | None = None
     sheets_url: str | None = None
@@ -77,6 +79,7 @@ class ReportResponse(BaseModel):
     schedule_weekday: int | None
     schedule_monthday: int | None
     send_timezone: str
+    show_comparison: bool = True
     is_active: bool
     next_run_at: datetime | None = None
     last_run_at: datetime | None = None

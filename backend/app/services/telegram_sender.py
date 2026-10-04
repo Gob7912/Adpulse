@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
@@ -70,20 +71,21 @@ class TelegramSender:
         chat_id: int,
         text: str,
         message_thread_id: int | None = None
-    ) -> bool:
+    ) -> Any:
         """Sends an HTML formatted message to a Telegram chat, optionally within a forum topic."""
         if not self.bot:
             logger.warning("Telegram bot token is not configured. Skipping message delivery.")
             return False
 
         try:
-            await self.bot.send_message(
+            sent_msg = await self.bot.send_message(
                 chat_id=chat_id,
                 text=text,
                 message_thread_id=message_thread_id
             )
-            logger.info(f"Telegram message sent to chat_id={chat_id}, thread_id={message_thread_id}")
-            return True
+            msg_id = getattr(sent_msg, "message_id", None)
+            logger.info(f"Telegram message sent to chat_id={chat_id}, thread_id={message_thread_id}, msg_id={msg_id}")
+            return sent_msg
         except TelegramAPIError as exc:
             logger.error(f"Failed to send Telegram message to {chat_id}: {exc}")
             raise

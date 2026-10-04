@@ -38,6 +38,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    api.setOnUnauthorized(() => {
+      setUser(null);
+    });
     refreshUser();
   }, []);
 

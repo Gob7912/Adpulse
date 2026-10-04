@@ -105,6 +105,7 @@ def _build_report_response(report: Report, bot_username: str | None = None) -> R
         schedule_weekday=report.schedule_weekday,
         schedule_monthday=report.schedule_monthday,
         send_timezone=report.send_timezone,
+        show_comparison=getattr(report, "show_comparison", True),
         is_active=report.is_active,
         next_run_at=next_run,
         last_run_at=report.last_run_at,
@@ -167,6 +168,7 @@ async def create_report(
         schedule_weekday=data.schedule_weekday,
         schedule_monthday=data.schedule_monthday,
         send_timezone=data.send_timezone,
+        show_comparison=data.show_comparison,
         is_active=True,
         next_run_at=next_run
     )
@@ -523,18 +525,39 @@ async def duplicate_report(
 @router.post("/{report_id}/test-send")
 async def trigger_test_send(
     report_id: str,
+    cache_bypass: bool = True,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Executes a real test report run immediately and dispatches to connected destinations."""
+    """Executes a real-time LIVE test report run immediately and dispatches to connected destinations.
+    When cache_bypass=True, forces fresh Meta API request and Tashkent time synchronization.
+    """
     # Ensure user owns report
     query = select(Report).where(Report.id == report_id, Report.user_id == user.id)
     res = await db.execute(query)
     if not res.scalars().first():
         raise HTTPException(status_code=404, detail="Отчёт не найден")
 
-    result = await SchedulerService.execute_report(report_id=report_id, is_test=True)
-    return result
+    try:
+        result = await SchedulerService.execute_report(
+            report_id=report_id,
+            is_test=True,
+            cache_bypass=cache_bypass
+        )
+        if isinstance(result, dict) and result.get("status") == "failed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error") or "Не удалось отправить тестовый отчёт. Проверьте подключение Meta."
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Error during trigger_test_send for report {report_id}: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при выполнении тестовой отправки: {exc!s}"
+        )
 
 @router.post("/live-preview", response_model=ReportLivePreviewResponse)
 async def generate_live_preview(data: ReportLivePreviewRequest):
@@ -557,7 +580,8 @@ async def generate_live_preview(data: ReportLivePreviewRequest):
         selected_metrics=data.metrics,
         metric_values=sample_values,
         custom_labels=data.metric_labels,
-        lang=data.lang
+        lang=data.lang,
+        account_timezone=getattr(data, "account_timezone", None) or "Asia/Tashkent"
     )
 
     return ReportLivePreviewResponse(

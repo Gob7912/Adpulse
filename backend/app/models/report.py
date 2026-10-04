@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -52,6 +52,7 @@ class Report(Base):
     schedule_weekday: Mapped[int] = mapped_column(Integer, nullable=True)  # 0-6 (0=Monday) for weekly
     schedule_monthday: Mapped[int] = mapped_column(Integer, nullable=True)  # 1-31 for monthly
     send_timezone: Mapped[str] = mapped_column(String(100), default="Asia/Tashkent")
+    show_comparison: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
 
     # Runtime status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

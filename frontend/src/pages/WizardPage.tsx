@@ -19,7 +19,6 @@ import {
   Info,
   ChevronDown,
   Search,
-  ExternalLink,
   Copy,
   RefreshCw,
   Send,
@@ -34,13 +33,11 @@ import { getReportTypeIcon } from '../utils/reportIcons';
 
 interface WizardPageProps {
   onFinish: () => void;
-  onNavigateToTokenGuide: () => void;
   editingReportId?: string | null;
 }
 
 export const WizardPage: React.FC<WizardPageProps> = ({
   onFinish,
-  onNavigateToTokenGuide,
   editingReportId,
 }) => {
   const { language, t } = useLanguage();
@@ -97,6 +94,7 @@ export const WizardPage: React.FC<WizardPageProps> = ({
   const [scheduleWeekday, setScheduleWeekday] = useState(0); // Monday
   const [scheduleMonthday, setScheduleMonthday] = useState(1);
   const [sendTimezone, setSendTimezone] = useState('Asia/Tashkent');
+  const [showComparison, setShowComparison] = useState(true);
 
   // Step 5: Connection & Created report
   const [createdReport, setCreatedReport] = useState<Report | null>(null);
@@ -157,6 +155,9 @@ export const WizardPage: React.FC<WizardPageProps> = ({
           setScheduleMonthday(report.schedule_monthday);
         }
         setSendTimezone(report.send_timezone);
+        if (report.show_comparison !== undefined) {
+          setShowComparison(report.show_comparison);
+        }
         setCampaignScope(report.campaign_scope_type);
         setSelectedGoals(report.campaign_filter_goals || []);
         setNameContains(report.campaign_filter_name || '');
@@ -335,6 +336,7 @@ export const WizardPage: React.FC<WizardPageProps> = ({
       schedule_weekday: scheduleWeekday,
       schedule_monthday: scheduleMonthday,
       send_timezone: sendTimezone,
+      show_comparison: showComparison,
       delivery_channels: deliveryChannels,
       sheets_url: sheetsUrl.trim() || null,
       sheets_tab_name: sheetsTabName.trim() || 'Sheet1',
@@ -709,13 +711,6 @@ export const WizardPage: React.FC<WizardPageProps> = ({
                   <label className="text-xs font-semibold text-slate-200">
                     {t.step2.token_label}
                   </label>
-                  <button
-                    onClick={onNavigateToTokenGuide}
-                    className="text-[11px] text-indigo-400 hover:underline flex items-center space-x-1"
-                  >
-                    <span>{t.step2.token_help_link}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </button>
                 </div>
 
                 <div className="flex gap-2">
@@ -1209,6 +1204,26 @@ export const WizardPage: React.FC<WizardPageProps> = ({
                 <option value="America/New_York">America/New_York (UTC-4)</option>
               </select>
               <p className="text-[11px] text-slate-500 mt-1">{t.step4.send_tz_hint}</p>
+            </div>
+
+            {/* Show comparison toggle */}
+            <div className="pt-3 border-t border-slate-800">
+              <label className="flex items-start space-x-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={showComparison}
+                  onChange={(e) => setShowComparison(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900 cursor-pointer"
+                />
+                <div>
+                  <span className="block text-xs font-semibold text-slate-200 group-hover:text-white transition-colors">
+                    {t.step4.show_comparison_label}
+                  </span>
+                  <span className="block text-[11px] text-slate-400 mt-0.5">
+                    {t.step4.show_comparison_desc}
+                  </span>
+                </div>
+              </label>
             </div>
           </div>
         )}

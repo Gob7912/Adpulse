@@ -104,6 +104,8 @@ export const en = {
       'Sunday',
     ],
     day_suffix: 'th day of month',
+    show_comparison_label: 'Compare with previous period',
+    show_comparison_desc: 'Show change dynamics (▲/▼) next to metric values',
   },
   step5: {
     title: 'Connection',
@@ -175,6 +177,9 @@ export const en = {
     toast_send_success: 'Report triggered! Results sent to connected destinations.',
     toast_send_error: 'Failed to send report: ',
     toast_delete_error: 'Failed to delete report: ',
+    token_expired_banner_title: 'Meta Ads Token Expired or Invalid (Error 190)',
+    token_expired_banner_desc: 'Automated report delivery is paused. Update your access token to resume reporting.',
+    token_expired_banner_btn: 'Update Token',
   },
   topbar: {
     logged_as: 'Signed in as',
@@ -214,6 +219,7 @@ export const en = {
     th_duration: 'Duration',
     th_details: 'Details / Errors',
     status_success: 'Success',
+    status_no_data: 'No spend',
     status_partial: 'Partial',
     status_failed: 'Failed',
     sec: 's',

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';
 import { RunHistory } from '../types';
-import { Clock, Send, FileSpreadsheet, CheckCircle2, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Clock, Send, FileSpreadsheet, CheckCircle2, AlertTriangle, MinusCircle, ArrowLeft } from 'lucide-react';
 
 interface HistoryPageProps {
   onBack: () => void;
@@ -79,6 +79,11 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onBack }) => {
                         <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold flex items-center space-x-1 w-fit">
                           <CheckCircle2 className="w-3 h-3" />
                           <span>{t.history.status_success}</span>
+                        </span>
+                      ) : h.status === 'no_data' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-400/90 font-semibold flex items-center space-x-1 w-fit">
+                          <MinusCircle className="w-3 h-3" />
+                          <span>{t.history.status_no_data}</span>
                         </span>
                       ) : h.status === 'partial' ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold flex items-center space-x-1 w-fit">

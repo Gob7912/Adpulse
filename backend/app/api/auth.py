@@ -23,7 +23,8 @@ from app.security import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 def _build_user_response(user: User) -> UserResponse:
-    has_meta = bool(user.meta_connection and user.meta_connection.is_valid)
+    has_meta = bool(user.meta_connection and user.meta_connection.encrypted_access_token)
+    is_valid = bool(user.meta_connection.is_valid) if (user.meta_connection and has_meta) else True
     meta_name = user.meta_connection.meta_user_name if user.meta_connection else None
     meta_avatar = user.meta_connection.meta_avatar_url if user.meta_connection else None
     return UserResponse(
@@ -32,6 +33,7 @@ def _build_user_response(user: User) -> UserResponse:
         is_active=user.is_active,
         created_at=user.created_at,
         has_meta_connection=has_meta,
+        is_meta_valid=is_valid,
         meta_user_name=meta_name,
         meta_avatar_url=meta_avatar
     )

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { Sun, Moon, Globe, LogOut, Trash2, BookOpen, Clock, Activity, ChevronDown, User as UserIcon } from 'lucide-react';
+import { Sun, Moon, Globe, LogOut, Trash2, Clock, Activity, ChevronDown, User as UserIcon } from 'lucide-react';
 import { Language } from '../types';
 
 interface TopBarProps {
@@ -82,16 +82,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onNavigate, currentPage }) => {
               }`}
             >
               {t.nav.history}
-            </button>
-            <button
-              onClick={() => onNavigate('token-guide')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                currentPage === 'token-guide'
-                  ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              {t.nav.instructions}
             </button>
           </nav>
         )}
@@ -189,14 +179,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onNavigate, currentPage }) => {
                   >
                     <Clock className="w-3.5 h-3.5 text-sky-400" />
                     <span>{t.nav.history}</span>
-                  </button>
-
-                  <button
-                    onClick={() => onNavigate('token-guide')}
-                    className="w-full flex items-center space-x-2 px-3 py-2 text-slate-300 hover:bg-slate-800 transition-colors"
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{t.nav.instructions}</span>
                   </button>
 
                   <div className="my-1 border-t border-slate-800"></div>

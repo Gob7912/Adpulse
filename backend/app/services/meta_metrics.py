@@ -442,22 +442,23 @@ def get_default_labels(lang: str = "ru") -> dict[str, str]:
             labels[key] = definition.ru_label
     return labels
 
-def format_metric_value(val: float | None, format_type: str, currency: str = "USD", lang: str = "ru") -> str:
+def format_metric_value(val: float | None, format_type: str, currency: str = "USD", lang: str = "ru", is_approximate: bool = False) -> str:
     if val is None:
         if lang == "uz":
             return "mavjud emas"
         elif lang == "en":
             return "N/A"
         return "н/д"
+    prefix = "≈ " if is_approximate else ""
     if format_type == "currency":
         curr_symbol = "$" if currency == "USD" else f" {currency}"
         if currency == "USD":
-            return f"${val:,.2f}"
-        return f"{val:,.2f}{curr_symbol}"
+            return f"{prefix}${val:,.2f}"
+        return f"{prefix}{val:,.2f}{curr_symbol}"
     elif format_type == "percent":
-        return f"{val:.2f}%"
+        return f"{prefix}{val:.2f}%"
     elif format_type == "integer":
-        return f"{int(round(val)):,}".replace(",", " ")
+        return f"{prefix}{int(round(val)):,}".replace(",", " ")
     elif format_type == "decimal":
-        return f"{val:.2f}"
-    return str(val)
+        return f"{prefix}{val:.2f}"
+    return f"{prefix}{val}"

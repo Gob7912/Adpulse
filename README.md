@@ -2,7 +2,7 @@
 
 **English** | [Русский](README.ru.md)
 
-> **AdPulse** is a production-ready, self-hosted web platform designed for automated daily delivery of **Meta (Facebook & Instagram) Ads** performance reports directly to **Telegram** (private chats, group channels, forum topics) and **Google Sheets**.
+> **AdPulse** is a self-hosted web platform designed for automated daily delivery of **Meta (Facebook & Instagram) Ads** performance reports directly to **Telegram** (private chats, group channels, forum topics) and **Google Sheets**.
 >
 > A completely free, open-source alternative to proprietary SaaS reporting tools with no third-party branding or "Sent via..." footers.
 
@@ -10,12 +10,20 @@
 
 ## ⚡ Key Features
 
-- **100% Mathematically Sound Metrics**:
+- **Derived metrics (CPC, CPM, CTR, cost per result) are computed from summed spend and counts, not averaged across campaigns; period deltas are computed from the underlying components.**
   - Additive metrics are summed across campaigns (`spend`, `impressions`, `clicks`, `leads`, `messages`, `calls`...).
-  - **No ratio averaging!** All efficiency ratios (`CTR`, `CPC`, `CPM`, `CPP`, `CPL`, `Cost per DM`, `ROAS`) are calculated strictly from final totals.
-  - Deduplicated `reach` is fetched at the ad-account level with campaign filtering to avoid double-counting unique people.
-  - Reliable metric fallback: unrecorded or unsupported metrics safely display localized `"N/A"` instead of misleading zero values.
-- **Final Data Delay Guarantee**:
+  - Efficiency ratios (`CTR`, `CPC`, `CPM`, `CPP`, `CPL`, `Cost per DM`, `ROAS`) are calculated from totals without ratio averaging.
+  - Deduplicated `reach` is fetched at the ad-account level with campaign filtering.
+  - Unrecorded or unsupported metrics display localized `"N/A"` instead of zero values.
+- **Period-over-Period Comparison**:
+  - Sends a separate, beautifully structured Telegram message comparing current vs. previous period grouped by blocks (*General*, *Efficiency*, *Conversions & Cost*).
+  - Clear delta badges with polarity indicators (green for positive conversion / lower cost, red for decreased results, neutral for spend/impressions).
+  - Rounding rule: `.5` rounds away from zero (`−12.5% → −13%`, `+12.5% → +13%`), sub-1% deltas show one decimal place (`+0.3%`, `−0.5%`), `= 0%` strictly on exact equality.
+  - Rows with missing data in both periods are automatically suppressed.
+- **Snapshot Retention & Concurrency Protection**:
+  - Raw Meta API snapshots are stored with `fetched_at` and attribution settings, automatically pruned after 90 days by daily worker cleanup while preserving historical metrics and message IDs.
+  - PostgreSQL partial unique index prevents concurrent duplicate runs for the same period.
+- **Final Data Delay Buffer**:
   - Meta recalculates conversion attribution and late impressions for several hours after midnight. AdPulse enforces a configurable delay buffer (default 6 hours) past the period end in the account's timezone before sending scheduled runs.
 - **5-Step Report Wizard**:
   1. **Platform & Destinations**: Meta Ads source with multi-select delivery (Telegram, Google Sheets, or both).
@@ -129,10 +137,13 @@ ruff check .
 docker compose run --rm -v "$(pwd)/backend":/app -w /app api sh -c "pip install -r requirements-dev.txt && PYTHONPATH=. pytest -v && ruff check ."
 ```
 
-All 44 tests cover:
+Automated test suite covers:
 - Metric math and zero-division resilience without ratio averaging.
 - Final data delay buffer (6h) with account timezone handling.
 - Meta API client mocking, pagination, and Error 190 (Token Expired) handling.
+- Frozen Ads Manager golden fixtures and attribution parity verification.
+- PostgreSQL partial unique index concurrency protection and duplicate defense.
+- Sub-1% delta formatting, exact zero rules, and round-away-from-zero logic.
 - Telegram deep-link sanitization, topic/thread delivery, and error alerts.
 - Dynamic Google Sheets tab discovery and numeric cell formatting.
 - User data isolation and end-to-end report wizard workflows.
@@ -158,13 +169,13 @@ adpulse/
 │   │   └── security.py       # Argon2id, JWT, Fernet AES token encryption
 │   ├── alembic/              # Database migrations
 │   ├── worker.py             # Scheduler & bot polling daemon
-│   └── tests/                # 43 automated unit & integration tests
+│   └── tests/                # Automated unit & integration tests
 └── frontend/
     ├── src/
     │   ├── components/       # TopBar, WizardStepper, PreviewBubble
     │   ├── context/          # AuthContext, ThemeContext, LanguageContext
     │   ├── i18n/             # Translations (ru, uz, en)
-    │   ├── pages/            # WizardPage, DashboardPage, HistoryPage, LandingPage, TokenGuidePage
+    │   ├── pages/            # WizardPage, DashboardPage, HistoryPage, LandingPage
     │   ├── utils/            # Report icon helpers
     │   └── services/         # ApiClient
     └── package.json

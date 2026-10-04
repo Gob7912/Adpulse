@@ -9,13 +9,19 @@ import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { WizardPage } from './pages/WizardPage';
 import { HistoryPage } from './pages/HistoryPage';
-import { TokenGuidePage } from './pages/TokenGuidePage';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState<string>('landing');
   const [editingReportId, setEditingReportId] = useState<string | null>(null);
+
+  // Redirect to login if user session expires while on protected pages
+  React.useEffect(() => {
+    if (!loading && !user && ['dashboard', 'wizard', 'history'].includes(currentPage)) {
+      setCurrentPage('login');
+    }
+  }, [user, loading, currentPage]);
 
   if (loading) {
     return (
@@ -74,17 +80,12 @@ const AppContent: React.FC = () => {
               setEditingReportId(null);
               setCurrentPage('dashboard');
             }}
-            onNavigateToTokenGuide={() => setCurrentPage('token-guide')}
             editingReportId={editingReportId}
           />
         )}
 
         {activePage === 'history' && (
           <HistoryPage onBack={() => setCurrentPage('dashboard')} />
-        )}
-
-        {activePage === 'token-guide' && (
-          <TokenGuidePage onBack={() => setCurrentPage(user ? 'dashboard' : 'landing')} />
         )}
       </main>
     </div>

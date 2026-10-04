@@ -13,18 +13,21 @@ const API_BASE = '/api';
 
 class ApiClient {
   private token: string | null = null;
+  private onUnauthorized: (() => void) | null = null;
 
   constructor() {
-    this.token = localStorage.getItem('adpulse_jwt');
+    // Clear legacy localStorage token to rely exclusively on HTTP-only cookies
+    try {
+      localStorage.removeItem('adpulse_jwt');
+    } catch (_) {}
+  }
+
+  setOnUnauthorized(callback: () => void) {
+    this.onUnauthorized = callback;
   }
 
   setToken(token: string | null) {
     this.token = token;
-    if (token) {
-      localStorage.setItem('adpulse_jwt', token);
-    } else {
-      localStorage.removeItem('adpulse_jwt');
-    }
   }
 
   getToken() {
@@ -45,10 +48,16 @@ class ApiClient {
     const response = await fetch(url, {
       ...options,
       headers,
-      credentials: 'include', // Support HTTP-only cookies
+      credentials: 'include', // Always send HTTP-only cookies
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        this.token = null;
+        if (this.onUnauthorized) {
+          this.onUnauthorized();
+        }
+      }
       let errorMsg = `Request failed: ${response.statusText}`;
       try {
         const data = await response.json();
@@ -167,8 +176,8 @@ class ApiClient {
     return this.request<Report>(`/reports/${reportId}/duplicate`, { method: 'POST' });
   }
 
-  async triggerTestSend(reportId: string): Promise<any> {
-    return this.request(`/reports/${reportId}/test-send`, { method: 'POST' });
+  async triggerTestSend(reportId: string, cacheBypass: boolean = true): Promise<any> {
+    return this.request(`/reports/${reportId}/test-send?cache_bypass=${cacheBypass}`, { method: 'POST' });
   }
 
   async generateLivePreview(data: {

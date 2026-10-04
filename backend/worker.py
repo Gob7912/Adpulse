@@ -11,6 +11,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [WORKER] [%(levelname)s] %(name)s: %(message)s"
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("adpulse.worker")
 
 async def main():
