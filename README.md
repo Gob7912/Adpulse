@@ -183,6 +183,37 @@ adpulse/
 
 ---
 
+## 🩺 Worker Health & External Monitoring
+
+AdPulse includes a built-in heartbeat mechanism for the background scheduler worker:
+- Every execution loop iteration (~30s), the background worker updates its timestamp in the `worker_heartbeats` database table.
+- The `GET /health` endpoint checks this timestamp:
+  - If the heartbeat is fresh (<= 120s): returns HTTP `200 OK` with `{"status": "ok", "worker": {"status": "ok"}}`.
+  - If the heartbeat is stale (> 120s) or missing: returns HTTP `503 Service Unavailable` with `{"status": "degraded", "worker": {"status": "stale"}}`.
+
+### External Uptime Monitoring Example (Cron + Telegram)
+
+You can set up an external watchdog script (e.g. with cron, Uptime Kuma, or Datadog) to ping `/health` every 2 minutes and alert your team if the worker hangs:
+
+```bash
+#!/usr/bin/env bash
+API_URL="http://127.0.0.1:8000/health"
+TG_BOT_TOKEN="YOUR_BOT_TOKEN"
+TG_ADMIN_CHAT_ID="YOUR_ADMIN_CHAT_ID"
+
+STATUS_CODE=$(curl -s -o /tmp/adpulse_health.json -w "%{http_code}" "$API_URL")
+
+if [ "$STATUS_CODE" -ne 200 ]; then
+  MSG="⚠️ [AdPulse Alert] Worker or API is unhealthy! HTTP $STATUS_CODE. Response: $(cat /tmp/adpulse_health.json)"
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${TG_ADMIN_CHAT_ID}" \
+    -d "text=${MSG}"
+fi
+```
+
+---
+
 ## 📄 License
 
 This project is open-source under the [MIT License](LICENSE).
+

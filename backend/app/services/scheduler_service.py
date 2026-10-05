@@ -11,11 +11,13 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import AsyncSessionLocal
+from app.models.admin_alert import AdminAlert
 from app.models.destination import Destination
 from app.models.meta_connection import MetaConnection
 from app.models.report import Report
 from app.models.run_history import RunHistory
 from app.models.user import User
+from app.models.worker_heartbeat import WorkerHeartbeat
 from app.security import decrypt_secret
 from app.services.meta_client import MetaAPIError, MetaClient, MetaTokenExpiredError
 from app.services.meta_metrics import OBJECTIVE_TO_METRICS
@@ -26,6 +28,89 @@ from app.services.telegram_sender import telegram_sender
 logger = logging.getLogger("adpulse.scheduler")
 
 class SchedulerService:
+    @classmethod
+    async def notify_admin_alert(
+        cls,
+        report_name: str,
+        report_id: str,
+        alert_type: str,
+        detail: str,
+        dedup_key: str | None = None,
+        session_factory = None
+    ) -> bool:
+        """
+        Sends an operational alert to settings.TELEGRAM_ADMIN_CHAT_ID once per dedup_key.
+        Deduplication is stored persistently in the database table 'admin_alerts' to prevent
+        duplicate notifications across worker restarts and multiple instances.
+        Returns True if sent, False if skipped (already sent or admin chat id not configured).
+        """
+        if not getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None) or not getattr(settings, "TELEGRAM_BOT_TOKEN", None):
+            return False
+
+        if dedup_key:
+            session_cls = session_factory or AsyncSessionLocal
+            try:
+                async with session_cls() as s:
+                    existing = await s.scalar(
+                        select(AdminAlert).where(AdminAlert.alert_key == dedup_key)
+                    )
+                    if existing:
+                        logger.info(f"Admin alert suppressed: already recorded in DB (key={dedup_key})")
+                        return False
+
+                    s.add(AdminAlert(
+                        alert_key=dedup_key,
+                        alert_type=alert_type,
+                        created_at=datetime.now(timezone.utc)
+                    ))
+                    try:
+                        await s.commit()
+                    except IntegrityError:
+                        await s.rollback()
+                        logger.info(f"Admin alert race caught via unique key in DB (key={dedup_key})")
+                        return False
+            except Exception as db_err:
+                logger.warning(f"Error querying/recording admin alert in DB: {db_err}")
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        msg = (
+            f"🚨 <b>AdPulse Alert: {alert_type}</b>\n\n"
+            f"📊 <b>Report:</b> {report_name} (<code>{report_id}</code>)\n"
+            f"⚠️ <b>Detail:</b> {detail}\n"
+            f"🕒 <b>Time:</b> {now_str}"
+        )
+        try:
+            await telegram_sender.send_message(
+                bot_token=settings.TELEGRAM_BOT_TOKEN,
+                chat_id=settings.TELEGRAM_ADMIN_CHAT_ID,
+                text=msg
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send admin Telegram alert: {e}")
+            return False
+
+    @staticmethod
+    async def record_worker_heartbeat(
+        worker_name: str = "scheduler_worker",
+        session_factory = None
+    ) -> None:
+        """Records current UTC timestamp for worker health monitoring in the worker_heartbeats table."""
+        now_utc = datetime.now(timezone.utc)
+        session_cls = session_factory or AsyncSessionLocal
+        try:
+            async with session_cls() as s:
+                hb = await s.scalar(
+                    select(WorkerHeartbeat).where(WorkerHeartbeat.worker_name == worker_name)
+                )
+                if hb is None:
+                    s.add(WorkerHeartbeat(worker_name=worker_name, last_heartbeat_at=now_utc))
+                else:
+                    hb.last_heartbeat_at = now_utc
+                await s.commit()
+        except Exception as e:
+            logger.error(f"Failed to record worker heartbeat: {e}")
+
     @staticmethod
     def calculate_next_run(
         periodicity: str,
@@ -233,14 +318,27 @@ class SchedulerService:
                         now_utc = datetime.now(timezone.utc)
                         run_at_tz = existing_run.run_at if existing_run.run_at.tzinfo else existing_run.run_at.replace(tzinfo=timezone.utc)
                         if (now_utc - run_at_tz) > timedelta(minutes=15):
-                            logger.warning(
-                                f"Run {existing_run.id} for report {report.id} was stuck in sending state for > 15m. "
-                                "Marking as failed and advancing schedule (at-most-once semantics)."
-                            )
-                            existing_run.status = "failed"
-                            existing_run.error_message = "Worker execution timed out in sending state"
-                            report.last_run_status = "failed"
-                            report.last_run_error = existing_run.error_message
+                            has_delivered_tg = existing_run.telegram_message_id is not None
+                            if has_delivered_tg:
+                                logger.info(
+                                    f"Run {existing_run.id} for report {report.id} was stuck in sending state for > 15m, "
+                                    f"but telegram_message_id={existing_run.telegram_message_id} is present. Marking as success."
+                                )
+                                existing_run.status = "success"
+                                existing_run.telegram_delivered = True
+                                existing_run.error_message = None
+                                report.last_run_status = "success"
+                                report.last_run_error = None
+                            else:
+                                logger.warning(
+                                    f"Run {existing_run.id} for report {report.id} was stuck in sending state for > 15m without telegram_message_id. "
+                                    "Marking as failed and advancing schedule (at-most-once semantics)."
+                                )
+                                existing_run.status = "failed"
+                                existing_run.error_message = "Worker execution timed out in sending state"
+                                report.last_run_status = "failed"
+                                report.last_run_error = existing_run.error_message
+
                             report.next_run_at = SchedulerService.calculate_next_run(
                                 periodicity=report.periodicity,
                                 schedule_time_str=report.schedule_time,
@@ -251,12 +349,24 @@ class SchedulerService:
                                 account_tz_str=report.account_timezone
                             )
                             await session.commit()
-                            return {"status": "skipped", "message": "Stalled sending run marked failed"}
+                            if not has_delivered_tg:
+                                dedup_k = f"stalled:{report.id}:{existing_run.id}"
+                                await SchedulerService.notify_admin_alert(
+                                    report_name=report.name,
+                                    report_id=str(report.id),
+                                    alert_type="Stalled Sending Run",
+                                    detail=f"Run {existing_run.id} was stuck in sending state for > 15m. Marked failed to prevent duplicates.",
+                                    dedup_key=dedup_k
+                                )
+                            return {
+                                "status": "skipped",
+                                "message": "Stalled sending run marked success" if has_delivered_tg else "Stalled sending run marked failed"
+                            }
                         else:
                             logger.info(f"Report {report.id} is currently being sent by another worker (status=sending). Skipping.")
                             return {"status": "skipped", "message": "Report is currently sending"}
 
-            def record_failure(error_msg: str, tg_err: str | None = None, sheets_err: str | None = None):
+            async def record_failure(error_msg: str, tg_err: str | None = None, sheets_err: str | None = None):
                 duration = round(time.time() - start_time, 2)
                 now_utc = datetime.now(timezone.utc)
                 history = RunHistory(
@@ -290,12 +400,20 @@ class SchedulerService:
                         from_dt=now_utc,
                         account_tz_str=report.account_timezone
                     )
+                dedup_k = f"failed:{report.id}:{since_date}:{until_date}"
+                await SchedulerService.notify_admin_alert(
+                    report_name=report.name,
+                    report_id=str(report.id),
+                    alert_type="Report Execution Failed",
+                    detail=error_msg,
+                    dedup_key=dedup_k
+                )
 
             # Check Meta connection
             meta_conn = report.user.meta_connection if report.user else None
             if not meta_conn or not meta_conn.encrypted_access_token:
                 err_msg = "Meta-аккаунт не подключен или отсутствует токен доступа."
-                record_failure(err_msg)
+                await record_failure(err_msg)
                 await session.commit()
                 return {"status": "failed", "error": err_msg}
 
@@ -304,7 +422,7 @@ class SchedulerService:
                 access_token = decrypt_secret(meta_conn.encrypted_access_token)
             except Exception as e:
                 err_msg = f"Ошибка расшифровки токена: {e}"
-                record_failure(err_msg)
+                await record_failure(err_msg)
                 await session.commit()
                 return {"status": "failed", "error": err_msg}
 
@@ -478,7 +596,7 @@ class SchedulerService:
             except MetaTokenExpiredError as exc:
                 logger.error(f"Meta token expired for report {report.id}: {exc}")
                 meta_conn.is_valid = False
-                record_failure(str(exc))
+                await record_failure(str(exc))
 
                 # Send alert to Telegram destinations if linked
                 for dest in report.destinations:
@@ -497,13 +615,13 @@ class SchedulerService:
 
             except MetaAPIError as exc:
                 logger.error(f"Meta API error for report {report.id}: {exc}")
-                record_failure(str(exc))
+                await record_failure(str(exc))
                 await session.commit()
                 return {"status": "failed", "error": str(exc)}
 
             except Exception as exc:
                 logger.error(f"Unexpected error querying Meta for report {report.id}: {exc}", exc_info=True)
-                record_failure(str(exc))
+                await record_failure(str(exc))
                 await session.commit()
                 return {"status": "failed", "error": str(exc)}
 
@@ -702,6 +820,16 @@ class SchedulerService:
                 report.last_run_status = run_status
                 report.last_run_error = error_msg_full
 
+                if run_status == "failed":
+                    dedup_k = f"failed:{report.id}:{since_date}:{until_date}"
+                    await SchedulerService.notify_admin_alert(
+                        report_name=report.name,
+                        report_id=str(report.id),
+                        alert_type="Report Delivery Failed",
+                        detail=error_msg_full or "All destinations failed to deliver",
+                        dedup_key=dedup_k
+                    )
+
                 if not is_test:
                     # Schedule subsequent run
                     next_run = SchedulerService.calculate_next_run(
@@ -824,7 +952,7 @@ class SchedulerService:
                 logger.error(f"Error during check_all_meta_tokens: {e}", exc_info=True)
 
     @staticmethod
-    async def cleanup_old_raw_snapshots(days: int = 90) -> int:
+    async def cleanup_old_raw_snapshots(days: int = 90, session_factory=None) -> int:
         """
         Cleans up raw_meta_snapshot in RunHistory records older than `days` days.
         Preserves metrics_data, telegram_message_id, duration, and status for historical analytics,
@@ -832,8 +960,9 @@ class SchedulerService:
         Returns the number of records updated.
         """
         cutoff_dt = datetime.now(timezone.utc) - timedelta(days=days)
+        session_cls = session_factory or AsyncSessionLocal
         try:
-            async with AsyncSessionLocal() as session:
+            async with session_cls() as session:
                 stmt = (
                     update(RunHistory)
                     .where(
@@ -861,6 +990,9 @@ class SchedulerService:
         while True:
             try:
                 now_utc = datetime.now(timezone.utc)
+
+                # Record worker heartbeat for health check
+                await SchedulerService.record_worker_heartbeat()
 
                 # Daily Meta token health check
                 if last_token_check_at is None or (now_utc - last_token_check_at) >= timedelta(hours=24):

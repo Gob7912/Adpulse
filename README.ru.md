@@ -179,3 +179,34 @@ adpulse/
     │   └── services/         # ApiClient
     └── package.json
 ```
+
+---
+
+## 🩺 Мониторинг воркера и проверка /health
+
+AdPulse отслеживает состояние фонового планировщика через heartbeat в БД:
+- На каждом цикле планировщика (~30 с) воркер обновляет отметку времени в таблице `worker_heartbeats`.
+- Эндпоинт `GET /health` проверяет актуальность heartbeat:
+  - Если запись обновлена <= 120 секунд назад: возвращает HTTP `200 OK` с `{"status": "ok", "worker": {"status": "ok"}}`.
+  - Если запись старше 2 минут или отсутствует: возвращает HTTP `503 Service Unavailable` с `{"status": "degraded", "worker": {"status": "stale"}}`.
+
+### Настройка внешнего мониторинга (Cron + Telegram)
+
+Для надёжного мониторинга настройте опрос `/health` внешней системой (Uptime Kuma, Better Uptime или cron-скриптом):
+
+```bash
+#!/usr/bin/env bash
+API_URL="http://127.0.0.1:8000/health"
+TG_BOT_TOKEN="YOUR_BOT_TOKEN"
+TG_ADMIN_CHAT_ID="YOUR_ADMIN_CHAT_ID"
+
+STATUS_CODE=$(curl -s -o /tmp/adpulse_health.json -w "%{http_code}" "$API_URL")
+
+if [ "$STATUS_CODE" -ne 200 ]; then
+  MSG="⚠️ [AdPulse Alert] Воркер или API недоступны! HTTP $STATUS_CODE. Ответ: $(cat /tmp/adpulse_health.json)"
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${TG_ADMIN_CHAT_ID}" \
+    -d "text=${MSG}"
+fi
+```
+

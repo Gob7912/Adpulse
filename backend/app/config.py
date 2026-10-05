@@ -2,7 +2,7 @@
 import json
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = "AdPulse"
@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_BOT_USERNAME: str = "AdPulseBot"
     TELEGRAM_WEBHOOK_URL: str | None = None
+    TELEGRAM_ADMIN_CHAT_ID: int | str | None = Field(
+        default=None,
+        description="Optional admin Telegram chat ID for critical error alerts and stalled run notifications"
+    )
     
     # Google Service Account
     GOOGLE_SERVICE_ACCOUNT_JSON: str | None = None
@@ -100,6 +104,15 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5173",
             "http://127.0.0.1:3000",
         ]
+
+    @model_validator(mode="after")
+    def validate_cors_security(self) -> "Settings":
+        if "*" in self.CORS_ORIGINS:
+            raise ValueError(
+                "Insecure CORS configuration: Wildcard '*' in CORS_ORIGINS is forbidden "
+                "when allow_credentials=True (or in production). Specify explicit origin URLs (e.g. 'https://app.example.com')."
+            )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

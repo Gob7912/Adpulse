@@ -1,6 +1,7 @@
 import logging
 import math
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -12,6 +13,18 @@ from app.services.meta_metrics import (
 )
 
 logger = logging.getLogger("adpulse.report_engine")
+
+
+def round_money(val: float | int | Decimal | None) -> float | None:
+    """Rounds currency amounts and cost per result metrics using Decimal ROUND_HALF_UP to 2 decimal places."""
+    if val is None:
+        return None
+    try:
+        d = Decimal(str(val))
+        return float(d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    except Exception:
+        return round(float(val), 2)
+
 
 class ReportEngine:
     @staticmethod
@@ -25,6 +38,8 @@ class ReportEngine:
         Calculates start and end dates (YYYY-MM-DD) according to the ad account's timezone.
         Returns (since_date, until_date, period_end_dt_in_tz).
         When is_test=True, dynamically returns 'today' strictly in the ad account's timezone.
+        For scheduled periods, period_end_dt is set to midnight of the next day (00:00:00),
+        ensuring that adding FINAL_DATA_DELAY_HOURS (e.g. 6) gives exactly 06:00:00.
         """
         tz_target = account_tz_str or "Asia/Tashkent"
         try:
@@ -51,7 +66,8 @@ class ReportEngine:
             target_date = today - timedelta(days=1)
             since_date = target_date.isoformat()
             until_date = target_date.isoformat()
-            period_end_dt = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=tz)
+            # Period closes at midnight of the next day (00:00:00) so delay_hours=6 yields exactly 06:00:00
+            period_end_dt = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=tz)
 
         elif periodicity == "weekly":
             # Previous full calendar week (Monday to Sunday)
@@ -61,7 +77,9 @@ class ReportEngine:
             last_monday = last_sunday - timedelta(days=6)
             since_date = last_monday.isoformat()
             until_date = last_sunday.isoformat()
-            period_end_dt = datetime(last_sunday.year, last_sunday.month, last_sunday.day, 23, 59, 59, tzinfo=tz)
+            # Midnight immediately following Sunday (Monday 00:00:00)
+            next_day_sunday = last_sunday + timedelta(days=1)
+            period_end_dt = datetime(next_day_sunday.year, next_day_sunday.month, next_day_sunday.day, 0, 0, 0, tzinfo=tz)
 
         elif periodicity == "monthly":
             # Previous full calendar month
@@ -70,16 +88,17 @@ class ReportEngine:
             first_of_prev_month = last_of_prev_month.replace(day=1)
             since_date = first_of_prev_month.isoformat()
             until_date = last_of_prev_month.isoformat()
+            # Midnight immediately following last of prev month (1st of this month 00:00:00)
             period_end_dt = datetime(
-                last_of_prev_month.year, last_of_prev_month.month, last_of_prev_month.day,
-                23, 59, 59, tzinfo=tz
+                first_of_this_month.year, first_of_this_month.month, first_of_this_month.day,
+                0, 0, 0, tzinfo=tz
             )
         else:
             # Default to yesterday
             target_date = today - timedelta(days=1)
             since_date = target_date.isoformat()
             until_date = target_date.isoformat()
-            period_end_dt = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=tz)
+            period_end_dt = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=tz)
 
         return since_date, until_date, period_end_dt
 
@@ -121,7 +140,7 @@ class ReportEngine:
             curr_until = curr_target.isoformat()
             prev_since = prev_target.isoformat()
             prev_until = prev_target.isoformat()
-            period_end_dt = datetime(curr_target.year, curr_target.month, curr_target.day, 23, 59, 59, tzinfo=tz)
+            period_end_dt = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=tz)
 
         elif periodicity == "weekly":
             days_since_monday = today.weekday()
@@ -134,7 +153,8 @@ class ReportEngine:
             curr_until = curr_last_sunday.isoformat()
             prev_since = prev_last_monday.isoformat()
             prev_until = prev_last_sunday.isoformat()
-            period_end_dt = datetime(curr_last_sunday.year, curr_last_sunday.month, curr_last_sunday.day, 23, 59, 59, tzinfo=tz)
+            next_day_sunday = curr_last_sunday + timedelta(days=1)
+            period_end_dt = datetime(next_day_sunday.year, next_day_sunday.month, next_day_sunday.day, 0, 0, 0, tzinfo=tz)
 
         elif periodicity == "monthly":
             first_of_this_month = today.replace(day=1)
@@ -147,7 +167,7 @@ class ReportEngine:
             curr_until = curr_last_day.isoformat()
             prev_since = prev_first_day.isoformat()
             prev_until = prev_last_day.isoformat()
-            period_end_dt = datetime(curr_last_day.year, curr_last_day.month, curr_last_day.day, 23, 59, 59, tzinfo=tz)
+            period_end_dt = datetime(first_of_this_month.year, first_of_this_month.month, first_of_this_month.day, 0, 0, 0, tzinfo=tz)
 
         else:
             curr_target = today - timedelta(days=1)
@@ -156,7 +176,7 @@ class ReportEngine:
             curr_until = curr_target.isoformat()
             prev_since = prev_target.isoformat()
             prev_until = prev_target.isoformat()
-            period_end_dt = datetime(curr_target.year, curr_target.month, curr_target.day, 23, 59, 59, tzinfo=tz)
+            period_end_dt = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=tz)
 
         return curr_since, curr_until, prev_since, prev_until, period_end_dt
 
@@ -354,7 +374,6 @@ class ReportEngine:
             "page_visit",
             "onsite_conversion.messaging_user_profile_click",
             "profile_view",
-            "page_view",
         ]
         recorded_profile_visits = [actions_map[k] for k in profile_action_keys if k in actions_map]
         profile_visits_is_approximate = False
@@ -370,10 +389,21 @@ class ReportEngine:
             profile_visits = int(max(recorded_profile_visits))
             profile_visits_is_approximate = False
         else:
-            # Fallback when total_profile_visits indicator is absent
+            # Fallback when total_profile_visits indicator is absent.
+            # Strictly differentiate page_view and landing_page_view: landing_page_view must NEVER match page_view.
+            def _is_profile_action(k_str: str) -> bool:
+                k_low = k_str.lower()
+                if "landing_page_view" in k_low:
+                    return False
+                return (
+                    any(x in k_low for x in ("profile_visit", "page_visit", "profile_click"))
+                    or k_low == "page_view"
+                    or k_low.endswith(".page_view")
+                )
+
             custom_profile_actions = [
                 v for k, v in actions_map.items()
-                if any(x in k.lower() for x in ("profile_visit", "page_visit", "profile_click", "page_view"))
+                if _is_profile_action(k)
             ]
             if custom_profile_actions:
                 profile_visits = int(max(custom_profile_actions))
@@ -400,11 +430,11 @@ class ReportEngine:
         # Ratios (strictly computed from totals, never averaged; None if denominator is not positive or absent)
         ctr = round((clicks / impressions * 100.0), 2) if impressions > 0 else 0.0
         ctr_link = round((link_clicks / impressions * 100.0), 2) if impressions > 0 else 0.0
-        cpc = round((spend / clicks), 2) if clicks > 0 else (0.0 if spend == 0 else None)
-        cpm = round((spend / impressions * 1000.0), 2) if impressions > 0 else (0.0 if spend == 0 else None)
-        cpp = round((spend / reach * 1000.0), 2) if reach > 0 else (0.0 if spend == 0 else None)
-        cpl = round((spend / leads), 2) if (leads is not None and leads > 0) else None
-        cost_per_dm = round((spend / messages), 2) if (messages is not None and messages > 0) else None
+        cpc = round_money(spend / clicks) if clicks > 0 else (0.0 if spend == 0 else None)
+        cpm = round_money(spend / impressions * 1000.0) if impressions > 0 else (0.0 if spend == 0 else None)
+        cpp = round_money(spend / reach * 1000.0) if reach > 0 else (0.0 if spend == 0 else None)
+        cpl = round_money(spend / leads) if (leads is not None and leads > 0) else None
+        cost_per_dm = round_money(spend / messages) if (messages is not None and messages > 0) else None
 
         # Cost per call: check cost_per_action_type or compute spend / calls
         call_cost_keys = [
@@ -416,12 +446,12 @@ class ReportEngine:
         cost_per_call = None
         for ck in call_cost_keys:
             if ck in cost_per_action_map and cost_per_action_map[ck] > 0:
-                cost_per_call = round(cost_per_action_map[ck], 2)
+                cost_per_call = round_money(cost_per_action_map[ck])
                 break
         if cost_per_call is None and calls is not None and calls > 0 and spend > 0:
-            cost_per_call = round((spend / calls), 2)
+            cost_per_call = round_money(spend / calls)
 
-        cost_per_install = round((spend / app_installs), 2) if (app_installs is not None and app_installs > 0) else None
+        cost_per_install = round_money(spend / app_installs) if (app_installs is not None and app_installs > 0) else None
 
         # Check purchase_roas array from Meta API
         purchase_roas_list = insight_row.get("purchase_roas", []) or []
@@ -441,9 +471,9 @@ class ReportEngine:
             api_roas = next(iter(roas_map.values()))
 
         if api_roas is not None and api_roas > 0:
-            roas = round(api_roas, 2)
+            roas = round_money(api_roas)
         elif spend > 0 and purchase_revenue > 0:
-            roas = round((purchase_revenue / spend), 2)
+            roas = round_money(purchase_revenue / spend)
         else:
             roas = None
 
@@ -456,7 +486,7 @@ class ReportEngine:
             approximate_metrics.append("profile_visits")
 
         return {
-            "spend": round(spend, 2),
+            "spend": round_money(spend) or 0.0,
             "impressions": impressions,
             "reach": reach,
             "clicks": clicks,
@@ -640,7 +670,7 @@ class ReportEngine:
                 diff_pct = 0.0
             elif abs(pct_raw) < 1.0:
                 # Requirement: для |Δ| меньше 1% показывать одну десятичную (−0.5%, +0.3%)
-                diff_pct = round(pct_raw, 1)
+                diff_pct = float(Decimal(str(pct_raw)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
                 if diff_pct == 0.0:
                     diff_pct = 0.1 if pct_raw > 0 else -0.1
 
@@ -661,12 +691,9 @@ class ReportEngine:
                     else:
                         badge = f"🔴 {sign_str}"  # conversion/result decreased
             else:
-                diff_pct = round(pct_raw, 1)
+                diff_pct = float(Decimal(str(pct_raw)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
                 # Requirement: .5 округлять от нуля (−12.5 → −13, +12.5 → +13)
-                if diff_pct >= 0:
-                    pct_int = int(math.floor(diff_pct + 0.5))
-                else:
-                    pct_int = int(math.ceil(diff_pct - 0.5))
+                pct_int = int(Decimal(str(pct_raw)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
                 if pct_int > 0:
                     sign_str = f"▲ +{pct_int}%"
                     if key in neutral_metrics:

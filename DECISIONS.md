@@ -171,4 +171,13 @@ This document records sensible defaults, design decisions, and Meta Marketing AP
   - `RunHistory` stores `raw_meta_snapshot` (including `fetched_at` ISO timestamp, `attribution_mode`, account insights, and campaign insights for both current and prior comparison periods) for dispute resolution and auditing.
   - `RunHistory` records `telegram_message_id` immediately upon successful Telegram dispatch to link database run records directly to sent chat messages.
 
+---
+
+## 12. Empirical Grounding and Hypothesis Labeling for Data Discrepancies
+- **Strict Empirical Proof for Discrepancy Root Causes**:
+  - Any explanation, incident post-mortem, or analysis of numerical discrepancies between Meta API data, Ads Manager interface figures, database run records, or Telegram message contents must be strictly grounded in verifiable, concrete data artifacts (e.g. raw JSON payloads with timestamps, network trace logs, database rows).
+- **Mandatory `[Гипотеза]` / `[Hypothesis]` Labeling**:
+  - If a discrepancy cannot be conclusively proven with direct data artifacts, any proposed explanation (e.g. distributed aggregation delay, cache staleness, late-arriving logs) must be explicitly designated with the label `[Гипотеза]` / `[Hypothesis]`.
+  - Unverified assertions or rationalizations (such as attributing variations in spend or impressions to attribution windows, which only apply to conversions) are prohibited from being presented as established facts.
+
 

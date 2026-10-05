@@ -11,12 +11,14 @@ def test_calculate_period_dates_daily():
         account_tz_str="Asia/Tashkent",
         reference_dt=ref_dt
     )
-    # Yesterday relative to Sep 29 is Sep 28
+    # Yesterday relative to Sep 29 is Sep 28.
+    # Period closes at midnight of next day (Sep 29 00:00:00) so delay of 6h yields exactly 06:00:00
     assert since_d == "2026-09-28"
     assert until_d == "2026-09-28"
-    assert period_end_dt.day == 28
-    assert period_end_dt.hour == 23
-    assert period_end_dt.minute == 59
+    assert period_end_dt.day == 29
+    assert period_end_dt.hour == 0
+    assert period_end_dt.minute == 0
+    assert period_end_dt.second == 0
 
 def test_calculate_period_dates_weekly():
     # Tuesday Sep 29, 2026
@@ -26,10 +28,13 @@ def test_calculate_period_dates_weekly():
         account_tz_str="UTC",
         reference_dt=ref_dt
     )
-    # Last full week was Monday Sep 21 to Sunday Sep 27
+    # Last full week was Monday Sep 21 to Sunday Sep 27.
+    # Period closes at midnight following Sunday (Monday Sep 28 00:00:00)
     assert since_d == "2026-09-21"
     assert until_d == "2026-09-27"
-    assert period_end_dt.day == 27
+    assert period_end_dt.day == 28
+    assert period_end_dt.hour == 0
+    assert period_end_dt.minute == 0
 
 def test_calculate_period_dates_monthly():
     ref_dt = datetime(2026, 9, 15, 12, 0, 0, tzinfo=ZoneInfo("UTC"))
@@ -681,5 +686,53 @@ def test_comparison_message_omits_double_nd_and_keeps_val_to_nd():
     # 3. Present metrics render normally
     assert "• <b>Расход</b>: <code>$100.00</code> → <code>$100.00</code> = 0%" in msg
     assert "• <b>Звонки</b>: <code>8</code> → <code>10</code> 🟢 ▲ +25%" in msg
+
+
+def test_strict_action_type_comparison_landing_page_view_not_profile_visit():
+    """
+    Verifies that landing_page_view is strictly distinguished from page_view and profile_visits.
+    An action type of 'landing_page_view' must NEVER be counted as profile_visits.
+    """
+    insight_row = {
+        "spend": "50.00",
+        "impressions": "1000",
+        "reach": "800",
+        "clicks": "100",
+        "actions": [
+            {"action_type": "landing_page_view", "value": "45"}
+        ]
+    }
+    metrics = ReportEngine.compute_aggregated_metrics(insight_row)
+    assert metrics["landing_page_views"] == 45
+    # profile_visits must NOT match landing_page_view
+    assert metrics["profile_visits"] != 45
+    # If link_clicks fallback is triggered, it's None or 0 because link_click was not present
+    assert metrics["profile_visits"] is None
+
+
+def test_money_rounding_decimal_round_half_up():
+    """
+    Verifies that monetary metrics and cost per result are rounded using
+    Decimal with ROUND_HALF_UP (e.g., .005 rounds up away from zero).
+    """
+    # 2.675 standard banker's rounding would round down to 2.67; ROUND_HALF_UP must round up to 2.68!
+    # spend = 2.675, clicks = 1 -> cpc = 2.68
+    insight_row = {
+        "spend": "2.675",
+        "impressions": "1000",
+        "reach": "1000",
+        "clicks": "1",
+        "actions": [
+            {"action_type": "lead", "value": "1"},
+            {"action_type": "onsite_conversion.messaging_conversation_started_7d", "value": "1"},
+            {"action_type": "click_to_call_native_call_placed", "value": "1"}
+        ]
+    }
+    metrics = ReportEngine.compute_aggregated_metrics(insight_row)
+    assert metrics["spend"] == 2.68
+    assert metrics["cpc"] == 2.68
+    assert metrics["cpl"] == 2.68
+    assert metrics["cost_per_dm"] == 2.68
+    assert metrics["cost_per_call"] == 2.68
 
 

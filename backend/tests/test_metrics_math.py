@@ -40,7 +40,7 @@ def test_metrics_aggregation_and_strict_ratios():
     # Ratios strictly computed from totals (never averaged)
     assert metrics["ctr"] == 4.0
     assert metrics["ctr_link"] == 2.0
-    assert metrics["cpc"] == 0.12
+    assert metrics["cpc"] == 0.13  # 150 / 1200 = 0.125 -> 0.13 under Decimal ROUND_HALF_UP
     assert metrics["cpm"] == 5.0
     assert metrics["cpp"] == 6.0
 

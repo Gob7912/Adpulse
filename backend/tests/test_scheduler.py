@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.services.report_engine import ReportEngine
 from app.services.scheduler_service import SchedulerService
 
 
@@ -19,8 +20,8 @@ def test_scheduler_calculate_next_run_daily():
         account_tz_str="Asia/Tashkent"
     )
 
-    # In Tashkent, period ended Sep 28 23:59:59. Delay of 6 hours is Sep 29 05:59:59.
-    # Scheduled for 08:00 Sep 29 (> 05:59:59), so it should fire at 08:00 Tashkent time (03:00 UTC)
+    # In Tashkent, period ended Sep 28 midnight (Sep 29 00:00:00). Delay of 6 hours is Sep 29 06:00:00.
+    # Scheduled for 08:00 Sep 29 (> 06:00:00), so it should fire at 08:00 Tashkent time (03:00 UTC)
     expected_local = datetime(2026, 9, 29, 8, 0, 0, tzinfo=tz)
     assert next_run == expected_local.astimezone(timezone.utc)
 
@@ -28,7 +29,7 @@ def test_scheduler_enforces_final_data_delay():
     tz = ZoneInfo("Asia/Tashkent")
     base_dt = datetime(2026, 9, 29, 1, 0, 0, tzinfo=tz)
 
-    # Scheduled for 02:00 (only 2 hours after midnight). 6-hour delay requires waiting until 06:00!
+    # Scheduled for 02:00 (only 2 hours after midnight). 6-hour delay requires waiting until exactly 06:00:00!
     next_run = SchedulerService.calculate_next_run(
         periodicity="daily",
         schedule_time_str="02:00",
@@ -37,9 +38,9 @@ def test_scheduler_enforces_final_data_delay():
         account_tz_str="Asia/Tashkent"
     )
 
-    # Must be deferred to at least 06:00 Tashkent time
-    min_ready_local = datetime(2026, 9, 29, 5, 59, 59, tzinfo=tz)
-    assert next_run >= min_ready_local.astimezone(timezone.utc)
+    # Must be deferred to exactly 06:00:00 Tashkent time
+    min_ready_local = datetime(2026, 9, 29, 6, 0, 0, tzinfo=tz)
+    assert next_run == min_ready_local.astimezone(timezone.utc)
 
 
 @pytest.mark.asyncio
@@ -300,9 +301,10 @@ async def test_scheduler_pipeline_show_comparison_toggle():
 
     mock_client = MagicMock()
     # Multi-period returns both current and previous insight rows
+    curr_s, curr_u, prev_s, prev_u, _ = ReportEngine.calculate_comparison_dates("daily", "Asia/Tashkent")
     mock_client.get_multi_period_insights = AsyncMock(return_value={
-        ("2026-10-03", "2026-10-03"): {"spend": "100.00", "actions": [{"action_type": "lead", "value": "10"}]},
-        ("2026-10-02", "2026-10-02"): {"spend": "80.00", "actions": [{"action_type": "lead", "value": "5"}]}
+        (curr_s, curr_u): {"spend": "100.00", "actions": [{"action_type": "lead", "value": "10"}]},
+        (prev_s, prev_u): {"spend": "80.00", "actions": [{"action_type": "lead", "value": "5"}]}
     })
     mock_client.get_insights = AsyncMock(return_value={"spend": "50.00", "impressions": "1000"})
 
@@ -385,9 +387,10 @@ async def test_scheduler_telegram_message_id_and_raw_snapshot_saved():
 
     mock_client = MagicMock()
     mock_client.use_account_attribution_setting = True
+    curr_s, curr_u, prev_s, prev_u, _ = ReportEngine.calculate_comparison_dates("daily", "Asia/Tashkent")
     mock_client.get_multi_period_insights = AsyncMock(return_value={
-        ("2026-10-03", "2026-10-03"): {"spend": "46.45", "impressions": "52040", "reach": "48755", "clicks": "568"},
-        ("2026-10-02", "2026-10-02"): {"spend": "46.66", "impressions": "56411", "reach": "52493", "clicks": "529"},
+        (curr_s, curr_u): {"spend": "46.45", "impressions": "52040", "reach": "48755", "clicks": "568"},
+        (prev_s, prev_u): {"spend": "46.66", "impressions": "56411", "reach": "52493", "clicks": "529"},
     })
     mock_client.get_campaign_insights = AsyncMock(side_effect=[
         # curr period campaign insights

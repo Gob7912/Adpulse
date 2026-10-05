@@ -1,21 +1,44 @@
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.database import AsyncSessionLocal, engine
 from app.models.report import Report
 from app.models.run_history import RunHistory
 from app.models.user import User
 from app.services.scheduler_service import SchedulerService
 
+# Strictly enforce testing ONLY against adpulse_test database, NEVER against production adpulse
+PG_TEST_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    os.environ.get(
+        "DATABASE_URL",
+        "postgresql+asyncpg://adpulse:adpulse_secure_password_replace_me@127.0.0.1:5432/adpulse_test"
+    )
+)
+if "@db:5432" in PG_TEST_URL:
+    PG_TEST_URL = PG_TEST_URL.replace("@db:5432", "@127.0.0.1:5432")
+if "adpulse_test" not in PG_TEST_URL:
+    PG_TEST_URL = PG_TEST_URL.rsplit("/", 1)[0] + "/adpulse_test"
+
+pg_test_engine = create_async_engine(PG_TEST_URL, pool_pre_ping=True)
+PgTestSessionLocal = async_sessionmaker(
+    bind=pg_test_engine,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+    class_=AsyncSession
+)
+
 
 @pytest.fixture(autouse=True)
 async def cleanup_db_pool():
     yield
-    await engine.dispose()
+    await pg_test_engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -26,10 +49,11 @@ async def test_postgres_partial_unique_index_blocks_duplicate_sending_and_succes
     enforces uniqueness for (report_id, period_start, period_end) when:
     is_test = False AND status IN ('success', 'no_data', 'sending').
     """
-    async with AsyncSessionLocal() as session:
-        # Check database engine dialect is PostgreSQL
+    async with PgTestSessionLocal() as session:
+        # Check database engine dialect is PostgreSQL and target is strictly adpulse_test
         bind = session.get_bind()
         assert bind.dialect.name == "postgresql", f"Expected postgresql dialect, got {bind.dialect.name}"
+        assert "adpulse_test" in str(bind.url), f"Must ONLY run against adpulse_test, got {bind.url}"
 
         # Setup test user and report
         test_email = f"pg_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -151,7 +175,7 @@ async def test_postgres_partial_unique_index_allows_multiple_is_test_runs():
     Verifies against real PostgreSQL that runs with is_test = True are excluded
     from the partial unique index and do NOT block each other.
     """
-    async with AsyncSessionLocal() as session:
+    async with PgTestSessionLocal() as session:
         test_email = f"pg_test_live_{uuid.uuid4().hex[:8]}@example.com"
         user = User(
             email=test_email,
@@ -241,7 +265,7 @@ async def test_postgres_cleanup_old_raw_snapshots_real_db():
     2. Preserves raw_meta_snapshot for records within the 90-day retention window.
     3. Leaves metrics_data and other fields intact.
     """
-    async with AsyncSessionLocal() as session:
+    async with PgTestSessionLocal() as session:
         test_email = f"pg_test_clean_{uuid.uuid4().hex[:8]}@example.com"
         user = User(
             email=test_email,
@@ -305,8 +329,8 @@ async def test_postgres_cleanup_old_raw_snapshots_real_db():
             old_run_id = old_run.id
             recent_run_id = recent_run.id
 
-            # Execute real cleanup in PostgreSQL
-            cleaned_count = await SchedulerService.cleanup_old_raw_snapshots(days=90)
+            # Execute real cleanup in PostgreSQL using test session
+            cleaned_count = await SchedulerService.cleanup_old_raw_snapshots(days=90, session_factory=PgTestSessionLocal)
             assert cleaned_count >= 1
 
             # Verify in PostgreSQL
